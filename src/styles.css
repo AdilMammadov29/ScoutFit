@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", "Iowan Old Style", Palatino, Georgia, serif;
+
+  --color-paper: #efeae1;
+  --color-cream: #faf7f2;
+  --color-ink: #1c1915;
+  --color-muted: #6f675e;
+  --color-line: #e3dbd0;
+  --color-pine: #1e4636;
+  --color-clay: #9a3e18;
+
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}
+[data-tema="koyu"] {
+  --color-paper: #14120f;
+  --color-cream: #1d1a16;
+  --color-ink: #efeae1;
+  --color-muted: #a39a8d;
+  --color-line: #2f2b25;
+  --color-pine: #7fb69a;
+  --color-clay: #e08a5f;
+}
