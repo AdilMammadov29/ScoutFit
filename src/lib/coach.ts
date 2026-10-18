@@ -42,14 +42,28 @@ type KocSonuc =
 
 export async function kocSor({ data }: { data: KocGirdi }): Promise<KocSonuc> {
   try {
-    const res = await fetch("http://localhost:3001/api/koc", {
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (!apiKey) return { ok: false, hata: "api_key_eksik" };
+
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-      signal: AbortSignal.timeout(15000),
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192",
+        messages: [
+          { role: "system", content: data.baglam },
+          { role: "user", content: data.soru }
+        ],
+        temperature: 0.1
+      }),
     });
+
     if (!res.ok) return { ok: false, hata: `http-${res.status}` };
-    return (await res.json()) as KocSonuc;
+    const json = await res.json();
+    return { ok: true, metin: json.choices[0].message.content };
   } catch {
     return { ok: false, hata: "ag" };
   }
