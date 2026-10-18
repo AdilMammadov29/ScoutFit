@@ -13,9 +13,7 @@
     "jsx": "react-jsx",
     "strict": true,
     "types": ["node"],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src"]
 }
