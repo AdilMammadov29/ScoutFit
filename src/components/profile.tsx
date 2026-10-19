@@ -374,8 +374,7 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
       />
       <div className="space-y-6">
         
-        {/* HESAP PANELİ BURAYA EKLENDİ */}
-       <HesapPanel />
+        <HesapPanel />
 
         {!profil ? (
           <Panel>
@@ -392,9 +391,9 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
             <KiloPanel />
           </>
         )}
-                <HesapPanel />
+        
         <AyarPanel />
-        <AyarPanel />
+        
       </div>
     </div>
   );
