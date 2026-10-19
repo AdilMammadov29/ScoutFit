@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { bulutuBaglan, bulutuDurdur } from "@/lib/sync";
+import { useOturum } from "@/lib/auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<any>(null);
@@ -17,10 +19,21 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+        useOturum.getState().setEmail(session.user.email ?? null);
+        void bulutuBaglan(session.user.id);
+      }
       setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setSession(session);
+      if (session?.user) {
+        useOturum.getState().setEmail(session.user.email ?? null);
+        void bulutuBaglan(session.user.id);
+      } else {
+        bulutuDurdur();
+        useOturum.getState().setEmail(null);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -42,12 +55,24 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     setMesaj("Buluta bağlanıyor...");
 
     if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: sifre });
-      if (error) setMesaj("Giriş başarısız: " + error.message);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: sifre });
+      if (error) {
+        setMesaj("Giriş başarısız: " + error.message);
+      } else if (data.session?.user) {
+        useOturum.getState().setEmail(data.session.user.email ?? null);
+        await bulutuBaglan(data.session.user.id);
+      }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password: sifre });
-      if (error) setMesaj("Kayıt hatası: " + error.message);
-      else setMesaj("Hesap oluşturuldu, giriş yapılıyor...");
+      const { data, error } = await supabase.auth.signUp({ email, password: sifre });
+      if (error) {
+        setMesaj("Kayıt hatası: " + error.message);
+      } else {
+        setMesaj("Hesap oluşturuldu, giriş yapılıyor...");
+        if (data.session?.user) {
+          useOturum.getState().setEmail(data.session.user.email ?? null);
+          await bulutuBaglan(data.session.user.id);
+        }
+      }
     }
     setIslemde(false);
   };
@@ -106,7 +131,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           </div>
         </main>
 
-        {/* GİRİŞ / KAYIT MODALI (O İSTEDİĞİN İKİ ŞİFRELİ EKRAN) */}
+        {/* GİRİŞ / KAYIT MODALI */}
         {modalAcik && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md animate-fade-in">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#1a1a1a] p-8 shadow-2xl text-left relative">
@@ -148,7 +173,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
                   />
                 </div>
 
-                {/* SADECE KAYIT OLURKEN ŞİFRE ONAYI İSTER */}
                 {!isLogin && (
                   <div>
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-400">Şifreyi Onayla</label>
