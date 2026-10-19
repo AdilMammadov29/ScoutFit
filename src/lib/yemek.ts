@@ -25,7 +25,7 @@ function ayikla(text: string): YemekOge[] | null {
     for (const oge of parsed.slice(0, 6)) {
       const ad = String(oge?.ad ?? "").trim().slice(0, 80);
       const kcal = Math.round(Number(oge?.kcal));
-      if (!ad || !Number.isFinite(kcal) || kcal < 1 || kcal > 2500) continue;
+   if (!ad || !Number.isFinite(kcal) || kcal < 0 || kcal > 2500) continue;
       ogeler.push({ ad, kcal });
     }
     return ogeler.length ? ogeler : null;
