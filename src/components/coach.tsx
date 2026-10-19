@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { fmtKcal, profildenHesap } from "@/lib/engine";
 import { kocSor, yerelKoc } from "@/lib/coach";
 import { useFit } from "@/lib/store";
@@ -23,6 +23,7 @@ export function CoachView() {
 
   const [taslak, setTaslak] = useState("");
   const [yaziyor, setYaziyor] = useState(false);
+  const [dinliyor, setDinliyor] = useState(false);
 
   const kalori = profil ? profildenHesap(profil).gunlukKalori : 2100;
 
@@ -36,6 +37,40 @@ export function CoachView() {
       .join(", ");
     return `${temelBilgi} Kilo ${profil.kilo} kg, hedef ${profil.hedefKilo} kg, ${h.gunlukKalori} kcal, protein ${h.proteinG} g, karb ${h.karbonhidratG} g, yağ ${h.yagG} g. Son antrenmanlar: ${son || "yok"}.`;
   }
+
+  // Sesli Asistan (Mikrofon) Entegrasyonu
+  const sesliDinleBaslat = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "tr-TR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setDinliyor(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const sesMetni = event.results[0][0].transcript;
+      setTaslak(sesMetni);
+      setDinliyor(false);
+    };
+
+    recognition.onerror = () => {
+      setDinliyor(false);
+    };
+
+    recognition.onend = () => {
+      setDinliyor(false);
+    };
+
+    recognition.start();
+  };
 
   async function gonder(metin: string) {
     const soru = metin.trim();
@@ -121,6 +156,18 @@ export function CoachView() {
           void gonder(taslak);
         }}
       >
+        {/* MİKROFON BUTONU */}
+        <button
+          type="button"
+          onClick={sesliDinleBaslat}
+          className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-base transition-all ${
+            dinliyor ? "bg-red-500 text-white animate-pulse" : "bg-cream text-ink hover:bg-line/20"
+          }`}
+          title="Sesli Sor"
+        >
+          🎙️
+        </button>
+
         <label className="min-w-0 flex-1">
           <span className="sr-only">Sorun</span>
           <textarea
@@ -133,7 +180,7 @@ export function CoachView() {
                 void gonder(taslak);
               }
             }}
-            placeholder="Sorunu yaz"
+            placeholder={dinliyor ? "Dinliyorum, konuş..." : "Sorunu yaz veya mikrofonla söyle"}
             className="min-h-11 w-full resize-none rounded-xl border border-line bg-cream px-3 py-3 text-sm text-ink outline-none focus:border-pine"
           />
         </label>
