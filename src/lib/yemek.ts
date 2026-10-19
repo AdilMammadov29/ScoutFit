@@ -53,8 +53,7 @@ export async function yemekHesapla({ data }: { data: { metin?: string } }) {
         "Authorization": `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192", // En stabil Groq modeli
-        temperature: 0.1,
+        model: "llama-3.1-8b-instant",        temperature: 0.1,
         max_tokens: 500,
         messages: [
           {
