@@ -57,7 +57,7 @@ export async function kocSor({ data }: { data: KocGirdi }) {
         "Authorization": `Bearer ${String(apiKey).trim()}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant", // Gerçek ve çalışan model eklendi
+     model: "openai/gpt-oss-120b",
         temperature: 0.4,
         max_tokens: 700,
         messages: [

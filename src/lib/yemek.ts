@@ -53,7 +53,7 @@ export async function yemekHesapla({ data }: { data: { metin?: string } }) {
         "Authorization": `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",        temperature: 0.1,
+        model: "openai/gpt-oss-120b", temperature: 0.1,
         max_tokens: 500,
         messages: [
           {
