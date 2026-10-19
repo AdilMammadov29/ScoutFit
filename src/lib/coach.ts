@@ -34,37 +34,65 @@ export function yerelKoc(soru: string, kalori: number): string {
   return `${kalori} kcal hedefini bozmadan sorunu antrenman ya da öğün olarak netleştirirsem daha kısa cevap veririm. Neyi değiştirmek istiyorsun?`;
 }
 
-type KocGirdi = { soru: string; baglam: string };
+type KocGirdi = { soru: string; baglam?: string };
 
-type KocSonuc =
-  | { ok: true; metin: string }
-  | { ok: false; hata: string };
+export async function kocSor({ data }: { data: KocGirdi }) {
+  // 1. Senin çalışan kodundaki gibi güvenli veri temizliği
+  const soru = String(data?.soru ?? "").trim().slice(0, 600);
+  const baglam = String(data?.baglam ?? "").trim().slice(0, 500);
 
-export async function kocSor({ data }: { data: KocGirdi }): Promise<KocSonuc> {
+  if (!soru) return { ok: false as const, hata: "bos" };
+
+  // 2. Vite Frontend kuralı: import.meta.env
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) {
+    console.error("API Key eksik!");
+    return { ok: false as const, hata: "api_key_eksik" };
+  }
+
   try {
-    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-    if (!apiKey) return { ok: false, hata: "api_key_eksik" };
-
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { 
+      signal: AbortSignal.timeout(25000), // Zaman aşımı eklendi
+      headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        "Authorization": `Bearer ${apiKey.trim()}` // Boşluklara karşı trim
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama3-8b-8192", // En sorunsuz Groq modeli
+        temperature: 0.4,
+        max_tokens: 700,
         messages: [
-          { role: "system", content: data.baglam },
-          { role: "user", content: data.soru }
+          {
+            role: "system",
+            // 3. Groq boş system promptunda 400 atar, bu yüzden yedek metin koyduk
+            content: baglam || "Sen ScoutFit spor ve kalori hesaplama koçusun." 
+          },
+          { 
+            role: "user", 
+            content: soru 
+          }
         ],
-        temperature: 0.1
       }),
     });
 
-    if (!res.ok) return { ok: false, hata: `http-${res.status}` };
-    const json = await res.json();
-    return { ok: true, metin: json.choices[0].message.content };
-  } catch {
-    return { ok: false, hata: "ag" };
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Groq 400 Detayı:", res.status, errBody.slice(0, 300));
+      return { ok: false as const, hata: `http-${res.status}` };
+    }
+
+    // 4. Çalışan kodundaki güvenli JSON parçalama yöntemi
+    const body = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const text = body.choices?.[0]?.message?.content?.trim() ?? "";
+    
+    if (!text) return { ok: false as const, hata: "bos-yanit" };
+    return { ok: true as const, metin: text };
+
+  } catch (err) {
+    console.error("Groq Bağlantı Hatası:", err);
+    return { ok: false as const, hata: "ag" };
   }
 }
