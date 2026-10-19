@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fmtKcal, profildenHesap } from "@/lib/engine";
 import { kocSor, yerelKoc } from "@/lib/coach";
 import { useFit } from "@/lib/store";
-import { useAuth } from "@/lib/authStore"; // <-- 1. Auth store'u içeri aktardık
+import { useAuth } from "@/lib/authStore";
 import { PageTitle } from "@/components/ui";
 
 const HAZIR = [
@@ -17,8 +17,7 @@ export function CoachView() {
   const sohbet = useFit((s) => s.sohbet);
   const ekleMesaj = useFit((s) => s.ekleMesaj);
   const temizle = useFit((s) => s.temizleSohbet);
-  
-  // 2. Aktif oturum açan kullanıcıyı auth store'dan çekiyoruz
+
   const currentUser = useAuth((s) => s.currentUser);
   const kullaniciAdi = currentUser?.name || "Sporcu";
 
