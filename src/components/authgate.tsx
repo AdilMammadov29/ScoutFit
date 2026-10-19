@@ -1,427 +1,209 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import type { Session } from "@supabase/supabase-js";
-import { supabase, supabaseHazir } from "@/lib/supabase";
-import { useOturum } from "@/lib/auth";
-import { bulutaBaglan, bulutuDurdur, cikisYap } from "@/lib/sync";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { Btn, Panel } from "./ui";
 
-const alanClass =
-  "min-h-11 w-full rounded-xl border border-line bg-cream px-3 text-sm text-ink outline-none focus:border-pine";
-const dugmeClass =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-pine px-5 text-sm font-medium text-cream transition-opacity hover:opacity-90 disabled:opacity-40";
+export function AuthGate({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-type Mesaj = { tur: "hata" | "bilgi"; metin: string } | null;
-
-function hataCevir(err: unknown): string {
-  const m = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  if (m.includes("invalid login credentials")) return "E-posta ya da şifre hatalı.";
-  if (m.includes("email not confirmed"))
-    return "E-postanı henüz doğrulamadın. Gelen kutundaki bağlantıya tıkla.";
-  if (m.includes("already registered"))
-    return "Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.";
-  if (m.includes("rate limit") || m.includes("too many"))
-    return "Çok fazla deneme yapıldı. Biraz bekleyip tekrar dene.";
-  if (m.includes("failed to fetch") || m.includes("network"))
-    return "Bağlantı kurulamadı. İnternetini kontrol et.";
-  if (m.includes("valid email") || m.includes("invalid email"))
-    return "Geçerli bir e-posta adresi yaz.";
-  if (m.includes("password")) return "Şifre kabul edilmedi. Daha uzun ve farklı bir şifre dene.";
-  return "Bir sorun oluştu. Biraz sonra tekrar dene.";
-}
-
-function Ortala({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-6 text-ink">
-      {children}
-    </div>
-  );
-}
-
-function MesajSatiri({ mesaj }: { mesaj: Mesaj }) {
-  if (!mesaj) return null;
-  return (
-    <p
-      role={mesaj.tur === "hata" ? "alert" : "status"}
-      className={`text-sm ${mesaj.tur === "hata" ? "text-clay" : "text-pine"}`}
-    >
-      {mesaj.metin}
-    </p>
-  );
-}
-
-function Alan({ etiket, children }: { etiket: string; children: ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm text-muted">{etiket}</span>
-      {children}
-    </label>
-  );
-}
-
-const OZELLIKLER = [
-  "Hedef kilonu ve günlük kalorini hesapla",
-  "Antrenmanlarını ve öğünlerini kaydet",
-  "Kilo ilerlemeni grafikte takip et",
-  "Koça soru sor",
-];
-
-function GirisEkrani() {
-  const [mod, setMod] = useState<"giris" | "kayit" | "unuttum">("giris");
+  // Modal ve Form State'leri
+  const [modalAcik, setModalAcik] = useState(false);
   const [email, setEmail] = useState("");
   const [sifre, setSifre] = useState("");
-  const [sifre2, setSifre2] = useState("");
-  const [mesaj, setMesaj] = useState<Mesaj>(null);
-  const [bekle, setBekle] = useState(false);
-
-  const modDegistir = (yeni: "giris" | "kayit" | "unuttum") => {
-    setMod(yeni);
-    setMesaj(null);
-    setSifre("");
-    setSifre2("");
-  };
-
-  async function gonder(e: FormEvent) {
-    e.preventDefault();
-    if (bekle) return;
-    const posta = email.trim();
-    if (!posta) return setMesaj({ tur: "hata", metin: "E-posta adresini yaz." });
-    setBekle(true);
-    setMesaj(null);
-    try {
-      if (mod === "unuttum") {
-        const { error } = await supabase.auth.resetPasswordForEmail(posta, {
-          redirectTo: window.location.origin,
-        });
-        if (error) throw error;
-        setMesaj({
-          tur: "bilgi",
-          metin: "Bu adres kayıtlıysa şifre sıfırlama bağlantısını e-postana gönderdik.",
-        });
-      } else if (mod === "kayit") {
-        if (sifre.length < 8)
-          return setMesaj({ tur: "hata", metin: "Şifre en az 8 karakter olmalı." });
-        if (sifre !== sifre2) return setMesaj({ tur: "hata", metin: "Şifreler aynı değil." });
-        const { data, error } = await supabase.auth.signUp({
-          email: posta,
-          password: sifre,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          setMesaj({
-            tur: "bilgi",
-            metin:
-              "Hesabı oluşturduk. E-postana gelen doğrulama bağlantısına tıkla, sonra giriş yap.",
-          });
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: posta, password: sifre });
-        if (error) throw error;
-      }
-    } catch (err) {
-      setMesaj({ tur: "hata", metin: hataCevir(err) });
-    } finally {
-      setBekle(false);
-    }
-  }
-
-  const baslik =
-    mod === "kayit" ? "Hesap oluştur" : mod === "unuttum" ? "Şifreni sıfırla" : "Giriş yap";
-
-  return (
-    <div className="grid min-h-screen bg-paper text-ink lg:grid-cols-2">
-      <div className="flex flex-col justify-center px-8 py-12 lg:px-16">
-        <h1 className="font-display text-5xl leading-tight">ScoutFit</h1>
-        <p className="mt-3 max-w-md text-muted">Kişisel antrenman defteri.</p>
-        <ul className="mt-8 space-y-3 text-sm">
-          {OZELLIKLER.map((o) => (
-            <li key={o} className="flex gap-3">
-              <span className="text-pine" aria-hidden="true">
-                ✓
-              </span>
-              <span>{o}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-8 max-w-md text-sm text-muted">
-          Verilerin hesabında saklanır. Çıkış yapsan ya da cihaz değiştirsen de kaybolmaz.
-        </p>
-      </div>
-
-      <div className="flex items-center justify-center px-6 pb-12 lg:py-12">
-        <div className="w-full max-w-sm rounded-2xl border border-line bg-cream p-6">
-          {mod !== "unuttum" ? (
-            <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-paper p-1 text-sm">
-              <button
-                type="button"
-                onClick={() => modDegistir("giris")}
-                className={`min-h-10 rounded-lg ${mod === "giris" ? "bg-cream font-medium text-ink" : "text-muted"}`}
-              >
-                Giriş yap
-              </button>
-              <button
-                type="button"
-                onClick={() => modDegistir("kayit")}
-                className={`min-h-10 rounded-lg ${mod === "kayit" ? "bg-cream font-medium text-ink" : "text-muted"}`}
-              >
-                Kayıt ol
-              </button>
-            </div>
-          ) : null}
-
-          <h2 className="mb-4 font-display text-2xl">{baslik}</h2>
-
-          <form onSubmit={gonder} className="space-y-4">
-            <Alan etiket="E-posta">
-              <input
-                className={alanClass}
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </Alan>
-            {mod !== "unuttum" ? (
-              <Alan etiket={mod === "kayit" ? "Şifre (en az 8 karakter)" : "Şifre"}>
-                <input
-                  className={alanClass}
-                  type="password"
-                  autoComplete={mod === "kayit" ? "new-password" : "current-password"}
-                  value={sifre}
-                  onChange={(e) => setSifre(e.target.value)}
-                  required
-                />
-              </Alan>
-            ) : null}
-            {mod === "kayit" ? (
-              <Alan etiket="Şifre (tekrar)">
-                <input
-                  className={alanClass}
-                  type="password"
-                  autoComplete="new-password"
-                  value={sifre2}
-                  onChange={(e) => setSifre2(e.target.value)}
-                  required
-                />
-              </Alan>
-            ) : null}
-
-            <MesajSatiri mesaj={mesaj} />
-
-            <button type="submit" disabled={bekle} className={dugmeClass}>
-              {bekle
-                ? "Bekle..."
-                : mod === "kayit"
-                  ? "Hesap oluştur"
-                  : mod === "unuttum"
-                    ? "Bağlantı gönder"
-                    : "Giriş yap"}
-            </button>
-          </form>
-
-          <div className="mt-4 text-center text-sm text-muted">
-            {mod === "giris" ? (
-              <button type="button" onClick={() => modDegistir("unuttum")} className="underline">
-                Şifremi unuttum
-              </button>
-            ) : null}
-            {mod === "unuttum" ? (
-              <button type="button" onClick={() => modDegistir("giris")} className="underline">
-                Girişe dön
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function YeniSifre({ onBitti }: { onBitti: () => void }) {
-  const [sifre, setSifre] = useState("");
-  const [sifre2, setSifre2] = useState("");
-  const [mesaj, setMesaj] = useState<Mesaj>(null);
-  const [bekle, setBekle] = useState(false);
-
-  async function kaydet(e: FormEvent) {
-    e.preventDefault();
-    if (bekle) return;
-    if (sifre.length < 8) return setMesaj({ tur: "hata", metin: "Şifre en az 8 karakter olmalı." });
-    if (sifre !== sifre2) return setMesaj({ tur: "hata", metin: "Şifreler aynı değil." });
-    setBekle(true);
-    setMesaj(null);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: sifre });
-      if (error) throw error;
-      window.history.replaceState(null, "", window.location.pathname);
-      onBitti();
-    } catch (err) {
-      setMesaj({ tur: "hata", metin: hataCevir(err) });
-    } finally {
-      setBekle(false);
-    }
-  }
-
-  return (
-    <Ortala>
-      <form
-        onSubmit={kaydet}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-line bg-cream p-6"
-      >
-        <h2 className="font-display text-2xl">Yeni şifre belirle</h2>
-        <Alan etiket="Yeni şifre (en az 8 karakter)">
-          <input
-            className={alanClass}
-            type="password"
-            autoComplete="new-password"
-            value={sifre}
-            onChange={(e) => setSifre(e.target.value)}
-            required
-          />
-        </Alan>
-        <Alan etiket="Yeni şifre (tekrar)">
-          <input
-            className={alanClass}
-            type="password"
-            autoComplete="new-password"
-            value={sifre2}
-            onChange={(e) => setSifre2(e.target.value)}
-            required
-          />
-        </Alan>
-        <MesajSatiri mesaj={mesaj} />
-        <button type="submit" disabled={bekle} className={dugmeClass}>
-          {bekle ? "Bekle..." : "Şifreyi kaydet"}
-        </button>
-      </form>
-    </Ortala>
-  );
-}
-
-export function AuthGate({ children }: { children: ReactNode }) {
-  const [oturum, setOturum] = useState<Session | null>(null);
-  const [kontrolBitti, setKontrolBitti] = useState(false);
-  const [sifreYenile, setSifreYenile] = useState(
-    () => typeof window !== "undefined" && window.location.hash.includes("type=recovery"),
-  );
-  const [veriDurumu, setVeriDurumu] = useState<"yukleniyor" | "hazir" | "hata">("yukleniyor");
-  const [hataMetni, setHataMetni] = useState("");
-  const [deneme, setDeneme] = useState(0);
-  const setEmail = useOturum((s) => s.setEmail);
+  const [mesaj, setMesaj] = useState("");
+  const [islemde, setIslemde] = useState(false);
 
   useEffect(() => {
-    if (!supabaseHazir) {
-      setKontrolBitti(true);
-      return;
-    }
-    let iptal = false;
-    supabase.auth.getSession().then(({ data }) => {
-      if (iptal) return;
-      setOturum(data.session);
-      setKontrolBitti(true);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
     });
-    const { data: abone } = supabase.auth.onAuthStateChange((olay, yeni) => {
-      setOturum(yeni);
-      if (olay === "PASSWORD_RECOVERY") setSifreYenile(true);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSession(session);
     });
-    return () => {
-      iptal = true;
-      abone.subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const kullaniciId = oturum?.user.id ?? null;
-  const eposta = oturum?.user.email ?? null;
+  const devamEt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMesaj("");
 
-  useEffect(() => {
-    setEmail(eposta);
-  }, [eposta, setEmail]);
-
-  useEffect(() => {
-    if (!kullaniciId) {
-      setVeriDurumu("yukleniyor");
-      return;
+    if (!email.trim() || sifre.length < 6) {
+      return setMesaj("E-posta gerekli ve şifre en az 6 hane olmalıdır.");
     }
-    let iptal = false;
-    setVeriDurumu("yukleniyor");
-    bulutaBaglan(kullaniciId).then(
-      () => {
-        if (!iptal) setVeriDurumu("hazir");
-      },
-      (err: unknown) => {
-        console.error("Veri yüklenemedi:", err);
-        if (!iptal) {
-          setHataMetni(err instanceof Error ? err.message : String(err));
-          setVeriDurumu("hata");
+
+    setIslemde(true);
+    setMesaj("Buluta bağlanıyor...");
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password: sifre });
+
+    if (error) {
+      if (error.message.includes("Invalid login") || error.message.includes("not found") || error.message.includes("Invalid credentials")) {
+        const { error: regErr } = await supabase.auth.signUp({ email, password: sifre });
+        if (regErr) {
+          setMesaj("Kayıt hatası: " + regErr.message);
+        } else {
+          setMesaj("Hesap oluşturuldu, içeri alınıyorsun...");
         }
-      },
-    );
-    return () => {
-      iptal = true;
-      bulutuDurdur();
-    };
-  }, [kullaniciId, deneme]);
+      } else {
+        setMesaj("Hata: " + error.message);
+      }
+    }
+    setIslemde(false);
+  };
 
-  if (!supabaseHazir) {
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-muted">Yükleniyor...</div>;
+
+  // EĞER GİRİŞ YAPILMAMIŞSA, SENİN SİYAH EKRANIN GÖSTERİLİR
+  if (!session) {
     return (
-      <Ortala>
-        <div className="max-w-md space-y-3 rounded-2xl border border-line bg-cream p-6">
-          <h2 className="font-display text-2xl">Hesap sistemi ayarlanmamış</h2>
-          <p className="text-sm text-muted">
-            VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerleri bu ortamda tanımlı değil. Yerelde
-            .env dosyasına, yayında Vercel Environment Variables bölümüne ekle ve yeniden başlat.
-          </p>
-        </div>
-      </Ortala>
-    );
-  }
+      <div className="relative min-h-screen overflow-y-auto bg-paper text-ink selection:bg-pine selection:text-paper">
+        {/* --- DERİNLİK VE ARKA PLAN EFEKTLERİ --- */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[700px] w-[90vw] max-w-7xl rounded-full bg-gradient-to-tr from-pine/15 via-clay/10 to-transparent blur-[140px] pointer-events-none animate-pulse"></div>
+        <div className="absolute top-[800px] right-10 h-[500px] w-[500px] rounded-full bg-pine/10 blur-[120px] pointer-events-none"></div>
 
-  if (!kontrolBitti) {
-    return (
-      <Ortala>
-        <p className="text-sm text-muted">Yükleniyor...</p>
-      </Ortala>
-    );
-  }
-
-  if (!oturum) return <GirisEkrani />;
-
-  if (sifreYenile) return <YeniSifre onBitti={() => setSifreYenile(false)} />;
-
-  if (veriDurumu === "yukleniyor") {
-    return (
-      <Ortala>
-        <p className="text-sm text-muted">Verilerin yükleniyor...</p>
-      </Ortala>
-    );
-  }
-
-  if (veriDurumu === "hata") {
-    return (
-      <Ortala>
-        <div className="max-w-md space-y-4 rounded-2xl border border-line bg-cream p-6">
-          <h2 className="font-display text-2xl">Veriler yüklenemedi</h2>
-          <p className="text-sm text-muted">
-            Hesabındaki verilere ulaşılamadı. İnternetini ve Supabase tablosunu kontrol edip tekrar
-            dene. Hiçbir veri silinmedi.
-          </p>
-          {hataMetni ? <p className="break-words text-xs text-muted">{hataMetni}</p> : null}
-          <div className="flex gap-3">
-            <button type="button" className={dugmeClass} onClick={() => setDeneme((d) => d + 1)}>
-              Tekrar dene
-            </button>
+        {/* --- ÜST NAVBAR --- */}
+        <header className="sticky top-0 z-50 flex items-center justify-between border-b border-line/60 bg-paper/60 px-8 py-5 backdrop-blur-xl transition-all">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-3xl font-extrabold tracking-tight text-pine drop-shadow-sm">ScoutFit</span>
+          </div>
+          <div className="flex items-center gap-3">
             <button
-              type="button"
-              className="min-h-11 w-full rounded-xl border border-line px-5 text-sm text-ink"
-              onClick={() => void cikisYap(true)}
+              onClick={() => { setModalAcik(true); setMesaj(""); }}
+              className="rounded-2xl bg-pine px-6 py-2.5 text-xs font-semibold tracking-wide text-paper shadow-lg shadow-pine/25 transition-all hover:scale-105 active:scale-95"
             >
-              Çıkış yap
+              Giriş Yap / Kayıt Ol
             </button>
           </div>
-        </div>
-      </Ortala>
+        </header>
+
+        {/* --- ANA İÇERİK --- */}
+        <main className="relative px-6 pt-24 pb-36">
+          <div className="mx-auto max-w-5xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-pine/20 bg-pine/5 px-5 py-2 text-xs font-semibold text-pine mb-8 shadow-sm backdrop-blur-md animate-bounce">
+              <span>🚀</span> Yeni Nesil Kişisel Fitness & Akıllı Beslenme Asistanı
+            </div>
+            <h1 className="font-display text-6xl font-black tracking-tight sm:text-8xl text-ink leading-[1.05]">
+              Sınırlarını <span className="text-pine bg-gradient-to-r from-pine to-clay bg-clip-text text-transparent">ScoutFit</span> ile Yeniden Tanımla.
+            </h1>
+            <p className="mt-8 text-xl text-muted leading-relaxed max-w-2xl mx-auto font-normal">
+              Standart listelere veda et. Yapay zeka koçunla antrenmanlarını optimize et, kaçamaklarını bütçene göre esnet ve çoklu hesap desteğiyle zirveye oyna.
+            </p>
+            <div className="mt-10 flex justify-center gap-4">
+              <button
+                onClick={() => { setModalAcik(true); setMesaj(""); }}
+                className="rounded-2xl bg-pine px-10 py-5 text-base font-semibold text-paper shadow-2xl shadow-pine/30 transition-all hover:scale-105 hover:shadow-pine/40 active:scale-95"
+              >
+                Hemen Ücretsiz Başla
+              </button>
+            </div>
+          </div>
+
+          {/* İSTATİSTİK ŞERİDİ */}
+          <div className="mx-auto mt-28 max-w-5xl grid grid-cols-2 gap-6 sm:grid-cols-4 rounded-3xl border border-line/60 bg-cream/50 p-8 backdrop-blur-xl shadow-xl text-center">
+            <div className="transition-transform hover:scale-105">
+              <div className="font-display text-4xl font-black text-pine">Kalori</div>
+              <div className="text-xs font-medium text-muted mt-2 uppercase tracking-wider">Günlük Enerji & BMR</div>
+            </div>
+            <div className="transition-transform hover:scale-105">
+              <div className="font-display text-4xl font-black text-pine">Makro</div>
+              <div className="text-xs font-medium text-muted mt-2 uppercase tracking-wider">Protein, Karb & Yağ</div>
+            </div>
+            <div className="transition-transform hover:scale-105">
+              <div className="font-display text-4xl font-black text-pine">Hedef</div>
+              <div className="text-xs font-medium text-muted mt-2 uppercase tracking-wider">Kilo Al / Ver / Koru</div>
+            </div>
+            <div className="transition-transform hover:scale-105">
+              <div className="font-display text-4xl font-black text-pine">Esnek</div>
+              <div className="text-xs font-medium text-muted mt-2 uppercase tracking-wider">Kaçamak & Öğün Analizi</div>
+            </div>
+          </div>
+
+          {/* Özellikler Grid */}
+          <div className="mx-auto mt-28 grid max-w-5xl gap-8 sm:grid-cols-3">
+            <div className="group rounded-3xl border border-line/80 bg-cream/80 p-8 transition-all duration-300 hover:-translate-y-2 hover:border-pine/50 hover:shadow-2xl hover:shadow-pine/10">
+              <div className="mb-6 inline-flex rounded-2xl bg-paper p-4 text-3xl shadow-sm group-hover:scale-110 transition-transform">🧠</div>
+              <h3 className="font-display text-xl font-bold text-ink">Akıllı Koç & Esnek Öğün</h3>
+              <p className="mt-3 text-sm text-muted leading-relaxed">"Bugün cips yiyebilir miyim?" diye sor, yapay zeka kalori bütçene göre anında analiz edip yol göstersin.</p>
+            </div>
+            <div className="group rounded-3xl border border-line/80 bg-cream/80 p-8 transition-all duration-300 hover:-translate-y-2 hover:border-pine/50 hover:shadow-2xl hover:shadow-pine/10">
+              <div className="mb-6 inline-flex rounded-2xl bg-paper p-4 text-3xl shadow-sm group-hover:scale-110 transition-transform">⚡</div>
+              <h3 className="font-display text-xl font-bold text-ink">Çoklu Güvenli Profil</h3>
+              <p className="mt-3 text-sm text-muted leading-relaxed">Aynı cihazda şifre korumalı 3 adede kadar farklı profil aç, verilerin birbirine asla karışmasın.</p>
+            </div>
+            <div className="group rounded-3xl border border-line/80 bg-cream/80 p-8 transition-all duration-300 hover:-translate-y-2 hover:border-pine/50 hover:shadow-2xl hover:shadow-pine/10">
+              <div className="mb-6 inline-flex rounded-2xl bg-paper p-4 text-3xl shadow-sm group-hover:scale-110 transition-transform">📊</div>
+              <h3 className="font-display text-xl font-bold text-ink">Gelişmiş Gelişim Takibi</h3>
+              <p className="mt-3 text-sm text-muted leading-relaxed">Kilo geçmişin, antrenman bölgelerin ve tüm istatistiklerin tek ekranda modern grafiklerle elinin altında.</p>
+            </div>
+          </div>
+        </main>
+
+        {/* --- TEKLİ GİRİŞ / KAYIT MODALI (POPUP) --- */}
+        {modalAcik && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-md animate-fade-in">
+            <div className="w-full max-w-md scale-100 transition-transform">
+              <Panel>
+                <div className="relative p-8">
+                  <button
+                    onClick={() => setModalAcik(false)}
+                    className="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full bg-cream text-sm text-muted hover:text-ink transition-colors"
+                  >
+                    ✕
+                  </button>
+
+                  <h2 className="font-display text-3xl font-extrabold text-ink mb-2">
+                    Hoş Geldin
+                  </h2>
+                  <p className="text-xs text-muted mb-6">
+                    E-posta ve şifrenle giriş yap. Hesabın yoksa senin için otomatik oluşturacağız.
+                  </p>
+
+                  <form onSubmit={devamEt} className="flex flex-col gap-4">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">E-Posta Adresi</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Örn: mail@adresin.com"
+                        className="min-h-12 w-full rounded-2xl border border-line bg-cream px-4 text-sm text-ink outline-none transition-all focus:border-pine focus:ring-2 focus:ring-pine/20"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Şifre (En az 6 hane)</label>
+                      <input
+                        type="password"
+                        value={sifre}
+                        onChange={(e) => setSifre(e.target.value)}
+                        placeholder="••••••"
+                        className="min-h-12 w-full rounded-2xl border border-line bg-cream px-4 text-sm text-ink outline-none transition-all focus:border-pine focus:ring-2 focus:ring-pine/20"
+                      />
+                    </div>
+
+                    {mesaj && (
+                      <div className={`rounded-2xl border p-4 text-center text-xs font-medium ${mesaj.includes("hata") || mesaj.includes("gerekli") ? "border-clay/30 bg-clay/10 text-clay" : "border-pine/30 bg-pine/10 text-pine"}`}>
+                        {mesaj}
+                      </div>
+                    )}
+
+                    <div className="pt-3">
+                      <Btn type="submit">
+                        {islemde ? "İşleniyor..." : "Giriş Yap / Kayıt Ol"}
+                      </Btn>
+                    </div>
+                  </form>
+                </div>
+              </Panel>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
+  // EĞER GİRİŞ BAŞARILIYSA, UYGULAMANIN İÇİNE AL
   return <>{children}</>;
 }
