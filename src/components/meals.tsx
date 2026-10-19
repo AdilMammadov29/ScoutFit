@@ -1,50 +1,60 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useFit } from "@/lib/store";
+import { useOgun } from "@/lib/ogun";
 import { fmtKcal, profildenHesap } from "@/lib/engine";
 import { PageTitle } from "@/components/ui";
-import { yemekHesapla } from "@/lib/yemek";
+import { bugunAnahtar, yemekHesapla } from "@/lib/yemek";
 import type { Section } from "./shell";
 
+function hataMesaji(kod: string) {
+  if (kod === "ayiklanamadi")
+    return "Bunu bir yiyecek olarak anlayamadım. Miktarıyla yaz, örneğin: 2 dilim salam.";
+  if (kod === "yok") return "API anahtarı bulunamadı. Öğün hesabı için anahtarı ayarlaman gerekiyor.";
+  if (kod === "ag") return "Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.";
+  if (kod.startsWith("http-")) return `Servis hata verdi (${kod.slice(5)}). Biraz sonra tekrar dene.`;
+  return "Kalori hesaplanamadı. Bir kez daha dene.";
+}
+
 export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
-  const profil = useFit((s: any) => s.profil);
-  const store = useFit() as any;
+  const profil = useFit((s) => s.profil);
+  const tumOgunler = useOgun((s) => s.ogunler);
+  const ekleOgunler = useOgun((s) => s.ekleOgunler);
+  const silOgun = useOgun((s) => s.silOgun);
 
   const [metin, setMetin] = useState("");
   const [hata, setHata] = useState("");
+  const [bilgi, setBilgi] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [yerelOgunler, setYerelOgunler] = useState<{ id: string; isim: string; kalori: number }[]>([]);
 
-  const ogunler = store?.ogunler || store?.meals || yerelOgunler;
+  const bugun = bugunAnahtar();
+  const ogunler = tumOgunler.filter((o) => o.tarih === bugun);
   const h = profil ? profildenHesap(profil) : null;
   const gunlukHedef = h ? h.gunlukKalori : 2100;
+  const toplam = ogunler.reduce((acc, o) => acc + o.kalori, 0);
+  const kalan = gunlukHedef - toplam;
 
-  const toplamKalori = Array.isArray(ogunler)
-    ? ogunler.reduce((acc: number, curr: any) => acc + (Number(curr.kalori) || Number(curr.kcal) || 0), 0)
-    : 0;
-  const kalan = gunlukHedef - toplamKalori;
-
-  function kaydaEkle(yeni: { id: string; isim: string; kalori: number }) {
-    if (typeof store?.ogunEkle === "function") store.ogunEkle(yeni);
-    else if (typeof store?.addMeal === "function") store.addMeal(yeni);
-    else setYerelOgunler((onceki) => [...onceki, yeni]);
-  }
-
-  async function handleEkle(e: React.FormEvent) {
+  async function handleEkle(e: FormEvent) {
     e.preventDefault();
-    if (!metin.trim() || yukleniyor) return;
+    const girdi = metin.trim();
+    if (!girdi || yukleniyor) return;
     setHata("");
+    setBilgi("");
     setYukleniyor(true);
-    const sonuc = await yemekHesapla({ data: { metin: metin.trim() } });
-    if (!sonuc.ok) {
-      setHata("Kalori hesaplanamadı. Bir kez daha dene.");
+    try {
+      const sonuc = await yemekHesapla({ data: { metin: girdi } });
+      if (!sonuc.ok) {
+        setHata(hataMesaji(sonuc.hata));
+        return;
+      }
+      ekleOgunler(
+        sonuc.ogeler.map((o) => ({ tarih: bugunAnahtar(), isim: o.ad, kalori: o.kcal })),
+      );
+      const eklenen = sonuc.ogeler.reduce((a, o) => a + o.kcal, 0);
+      setBilgi(`${sonuc.ogeler.map((o) => o.ad).join(", ")} eklendi (+${fmtKcal(eklenen)} kcal).`);
+      setMetin("");
+    } finally {
       setYukleniyor(false);
-      return;
     }
-    for (const oge of sonuc.ogeler) {
-      kaydaEkle({ id: crypto.randomUUID(), isim: oge.ad, kalori: oge.kcal });
-    }
-    setMetin("");
-    setYukleniyor(false);
   }
 
   return (
@@ -55,10 +65,10 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
         lede={`Günlük hedefin ${fmtKcal(gunlukHedef)} kcal. Yediklerini yaz, kalori hedeften düşer.`}
       />
 
-      <div className="rounded-2xl border border-line bg-cream p-4 space-y-2">
+      <div className="space-y-2 rounded-2xl border border-line bg-cream p-4">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted">Bugün toplam alınan</span>
-          <span className="text-xl font-medium text-ink">{fmtKcal(toplamKalori)} kcal</span>
+          <span className="text-xl font-medium text-ink">{fmtKcal(toplam)} kcal</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted">Kalan</span>
@@ -83,21 +93,32 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
           {yukleniyor ? "Hesaplanıyor..." : "Kaydet"}
         </button>
       </form>
-      {hata ? <p className="text-sm text-ink">{hata}</p> : null}
+      {hata ? <p className="text-sm text-clay">{hata}</p> : null}
+      {bilgi ? <p className="text-sm text-pine">{bilgi}</p> : null}
 
       <div className="space-y-2">
-        {Array.isArray(ogunler) && ogunler.length > 0 ? (
-          ogunler.map((o: any) => (
+        {ogunler.length > 0 ? (
+          ogunler.map((o) => (
             <div
               key={o.id}
               className="flex items-center justify-between rounded-xl border border-line bg-cream p-4 text-sm"
             >
-              <span className="font-medium text-ink">{o.isim || o.ad || o.name}</span>
-              <span className="text-muted">{fmtKcal(o.kalori || o.kcal || 0)} kcal</span>
+              <span className="font-medium text-ink">{o.isim}</span>
+              <span className="flex items-center gap-4">
+                <span className="text-muted">{fmtKcal(o.kalori)} kcal</span>
+                <button
+                  type="button"
+                  onClick={() => silOgun(o.id)}
+                  className="text-muted hover:text-clay"
+                  aria-label="Öğünü sil"
+                >
+                  Sil
+                </button>
+              </span>
             </div>
           ))
         ) : (
-          <p className="py-6 text-center text-sm text-muted">Henüz kaydedilmiş öğün yok.</p>
+          <p className="py-6 text-center text-sm text-muted">Bugün henüz öğün eklemedin.</p>
         )}
       </div>
     </div>

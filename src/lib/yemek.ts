@@ -54,7 +54,7 @@ export async function yemekHesapla({ data }: { data: { metin?: string } }) {
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-120b", temperature: 0.1,
-        max_tokens: 500,
+        max_tokens: 1200,
         messages: [
           {
             role: "system",
@@ -68,6 +68,8 @@ Kurallar:
 - Probis: 100 gram yaklaşık 110 kcal.
 - Yumurta: yaklaşık 75 kcal. 
 - Porsiyon veya gramaj yoksa standart ölçü kullan.
+  - Tek kelimelik yiyecek adı verilirse (örn. salam, elma) standart bir porsiyon varsay.
+  - Yiyecek ya da içecek olmayan bir şey yazılırsa boş dizi [] döndür.
 - En fazla 6 farklı yemek ekle.
 - Sadece JSON listesi (array) döndür, nesne (object) değil.`
           },
