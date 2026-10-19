@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ScoutApp } from '../components/shell'
 import { AuthView } from '../components/auth'
 import { useAuth } from '../lib/authStore'
-
+<link rel="icon" href="data:," />
 // --- KAPI GÜVENLİĞİ (AUTH GUARD) ---
 function ProtectedRoute() {
   // 1. İçeride aktif bir kullanıcı var mı diye bakıyoruz
