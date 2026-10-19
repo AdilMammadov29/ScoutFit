@@ -72,13 +72,13 @@ export type Profil = {
 };
 
 export const VARSAYILAN_PROFIL: Profil = {
-  boy: 180,
-  kilo: 95,
-  hedefKilo: 80,
-  yas: 30,
+  boy: 0,
+  kilo: 0,
+  hedefKilo: 0,
+  yas: 0,
   cinsiyet: "erkek",
   aktivite: "orta",
-  hedef: "yag_yakimi",
+  hedef: "koruma",
 };
 
 function roundTo(n: number, digits: number) {
