@@ -35,18 +35,16 @@ function ayikla(text: string): YemekOge[] | null {
   }
 }
 
-const ISTEM = `Sen bir kalori hesaplama asistanısın. Kullanıcı yediği ya da içtiği şeyi yazar. Yemek, içecek, kahve, çay, atıştırmalık ve takviye hepsi geçerlidir.
+const ISTEM = `Sen bir kalori hesaplama asistanısın. Kullanıcı yediği ya da içtiği şeyi yazar. 
 Cevabın SADECE şu biçimde bir JSON dizisi olmalı, başka hiçbir metin yazma:
 [{ "ad": "Kısa Türkçe ad", "kcal": 150 }]
 
-Kurallar:
-- Yazılan her yiyecek ve içecek için bir öğe ekle. Anlayabildiğin her şeyi tahmin et, yaklaşık değer yeterli.
-- Yazı Türkçe, İngilizce ya da karışık olabilir (örn. ice americano, latte, probis, salam).
-- Miktar varsa ona göre hesapla. Miktar yoksa standart bir porsiyon varsay.
-- Şekersiz kahve ve çay gibi çok düşük kalorili içeceklere 2 ile 5 kcal arasında bir değer yaz. Sütlü ya da şekerliyse buna göre hesapla.
-- Örnek değerler: probis 100 g yaklaşık 110 kcal, yumurta yaklaşık 75 kcal.
-- En fazla 6 öğe ekle.
-- Yazılanın içinde hiçbir yiyecek ya da içecek yoksa (örn. sadece bir selamlama) boş dizi [] döndür.`;
+KRİTİK KURALLAR:
+1. "Tane", "Dilim", "Paket" ve "Gram" ayrımlarına ÇOK DİKKAT ET. 
+2. Paketli ürünlerde (Biscolata, Halley, Probis vb.) kullanıcı "tane" diyorsa, SADECE 1 TEK ADEDİN kalorisini bulup girilen sayıyla çarp. Asla paket kalorisi yazma! (Örn: 1 tane Biscolata Pia ~45 kcal'dir, 2 tane yazıldıysa 90 kcal hesapla).
+3. Miktar belirtilmemişse 1 standart porsiyon/adet varsay.
+4. Şekersiz çay/kahve 2-5 kcal arasıdır.
+5. Sadece geçerli bir JSON döndür, açıklama yapma.`;
 
 export async function yemekHesapla({ data }: { data: { metin?: string } }) {
   const metin = String(data?.metin ?? "").trim().slice(0, 300);
