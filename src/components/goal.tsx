@@ -13,7 +13,7 @@ import {
   fmtKcal,
 } from "@/lib/engine";
 import { useFit } from "@/lib/store";
-import { useEkstra } from "@/lib/extras"; // Kilo kayıtları için ekstra store
+import { useEkstra } from "@/lib/extras";
 import { Btn, Field, fieldClass, PageTitle, Panel, Row } from "@/components/ui";
 
 const HEDEFLER: HedefSecim[] = ["yag_yakimi", "kas_kutlesi", "koruma"];
@@ -26,8 +26,6 @@ export function GoalView() {
   const kayitli = useFit((s) => s.profil);
   const kaydet = useFit((s) => s.kaydetProfil);
   
-  // Kilo kayıtlarını ve ek verileri alıyoruz
-  const kiloKayitlari = useEkstra((s: any) => s.kiloKayitlari) || [];
   const yeniKiloEkle = useEkstra((s: any) => s.kiloEkle);
 
   const [form, setForm] = useState<Profil>(kayitli ?? VARSAYILAN_PROFIL);
@@ -65,12 +63,10 @@ export function GoalView() {
     setNot("Kaydedildi. Bugün ekranı bu sayıları kullanır.");
   }
 
-  // 2 Haftalık (14 Günlük) Tahmini Kilo Projeksiyonu Hesaplama
-  // Haftalık kalori açığı/fazlası ~7700 kcal = 1 kg yağ/kütle değişimi
-  const gunlukKaloriFarki = hesap.kaloriFarki; // Örn: -500 kcal (yağ yakımı) veya +300 kcal (kas)
+  // 14 günlük projeksiyon hesaplama
+  const gunlukKaloriFarki = hesap.kaloriFarki; 
   const gunlukKiloDegisimi = gunlukKaloriFarki / 7700; 
 
-  // 14 günlük tahmin listesi oluşturuyoruz
   const bugunkuKilo = form.kilo;
   const ikiHaftalikTahminler = Array.from({ length: 15 }, (_, gun) => {
     const tahminiKilo = Number((bugunkuKilo + gunlukKiloDegisimi * gun).toFixed(2));
@@ -82,13 +78,12 @@ export function GoalView() {
     const k = Number(yeniKiloInput.replace(",", "."));
     if (!Number.isFinite(k) || k < 35 || k > 250) return;
     
-    // Store'a yeni kiloyu ekle
     if (yeniKiloEkle) {
       yeniKiloEkle(k);
     }
     setForm({ ...form, kilo: k });
     setYeniKiloInput("");
-    setNot(`Yeni kilo (${k} kg) kaydedildi ve 2 haftalık projeksiyon güncellendi!`);
+    setNot(`Yeni kilo (${k} kg) kaydedildi ve projeksiyon güncellendi!`);
   }
 
   const fark =
@@ -101,11 +96,10 @@ export function GoalView() {
       <PageTitle
         index="02"
         title="Hedef & 2 Haftalık Projeksiyon"
-        le="Ölçümler üstte, hesap altta. GPS kalori harcamaların ve 14 günlük kilo tahmin çizgin burada."
+        lede="Ölçüler üstte, hesap altta. GPS kalori harcamaların ve 14 günlük kilo tahmin çizgin burada."
       />
 
       <div className="space-y-6">
-        {/* ÖLÇÜLER PANELİ */}
         <Panel title="Ölçüler">
           <div className="grid gap-4 py-5 sm:grid-cols-2">
             <Field label="Boy (cm)">
@@ -199,24 +193,22 @@ export function GoalView() {
           </fieldset>
         </Panel>
 
-        {/* 2 HAFTALIK (14 GÜNLÜK) KİLO TAHMİN GRAFİĞİ & PROJEKSİYON */}
+        {/* 2 HAFTALIK TAHMİN PROJEKSİYONU */}
         <Panel title="2 Haftalık Kilo Tahmin Projeksiyonu">
           <div className="py-4 space-y-4">
             <p className="text-xs text-muted leading-relaxed">
               Mevcut kalori dengene ({fark}) göre 14 gün sonra geleceğin tahmini kilo eğrisi:
             </p>
 
-            {/* Basit Görsel Çizgi / Liste Projeksiyonu */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
               {ikiHaftalikTahminler.filter((_, idx) => idx % 2 === 0 || idx === 14).map((t) => (
                 <div key={t.gun} className="rounded-xl border border-line bg-cream/30 p-3 text-center">
-                  <span className="text-[10px] uppercase font-bold text-muted">Gür {t.gun}</span>
+                  <span className="text-[10px] uppercase font-bold text-muted">Gün {t.gun}</span>
                   <div className="text-base font-extrabold text-pine mt-1">{t.kilo} kg</div>
                 </div>
               ))}
             </div>
 
-            {/* Yeni Kilo Giriş Formu (2 hafta sonra veya şimdi günvenellemek için) */}
             <form onSubmit={kiloKaydiYap} className="flex gap-2 pt-4 border-t border-line">
               <input
                 type="text"
@@ -236,7 +228,6 @@ export function GoalView() {
           </div>
         </Panel>
 
-        {/* HESAPLANAN DEĞERLER */}
         <Panel title={ayni ? "Kayıtlı hesap" : "Önizleme"}>
           <div className="border-b border-line py-5">
             <p className="font-display text-5xl tabular-nums leading-none text-ink">
