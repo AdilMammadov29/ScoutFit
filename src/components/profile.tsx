@@ -5,6 +5,7 @@ import { useAuth } from "../lib/authStore";
 import { useEkstra, type Birim, type KiloKaydi } from "../lib/extras";
 import type { Section } from "./shell";
 import { Btn, PageTitle, Panel, Row } from "./ui";
+import { tumVeriyiSifirla } from "@/lib/sync";
 // Eğer bu tipleri Grok dosyalarında (store.ts ve extras.ts) "export" ederek tanımladıysa:
 const LB = 2.20462;
 const alanClass =
@@ -305,16 +306,10 @@ function AyarPanel() {
     if (window.confirm(mesaj)) islem();
   };
 
-  const hepsiniSifirla = () => {
-    if (
-      !window.confirm(
-        "Profil, antrenmanlar, sohbet ve kilo kayıtları dahil tüm verilerin silinecek. Emin misin?",
-      )
-    )
-      return;
-    localStorage.clear();
-    window.location.reload();
-  };
+    const hepsiniSifirla = sor(
+    "Profil, antrenmanlar, sohbet, öğünler ve kilo kayıtları dahil hesabındaki tüm veriler silinecek. Emin misin?",
+    tumVeriyiSifirla,
+  );
 
   return (
     <Panel title="Ayarlar">
@@ -397,6 +392,8 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
             <KiloPanel />
           </>
         )}
+                <HesapPanel />
+        <AyarPanel />
         <AyarPanel />
       </div>
     </div>
