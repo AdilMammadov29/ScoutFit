@@ -8,37 +8,40 @@ export function bugunAnahtar(tarih = new Date()) {
 }
 
 function ayikla(text: string): YemekOge[] | null {
-  const temiz = text.replace(/```json|```/gi, "").trim();
-  const bas = temiz.indexOf("{");
-  const son = temiz.lastIndexOf("}");
-  if (bas < 0 || son <= bas) return null;
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(temiz.slice(bas, son + 1));
-  } catch {
+    const temiz = text.replace(/```json|```/gi, "").trim();
+    const bas = temiz.indexOf("[");
+    const son = temiz.lastIndexOf("]");
+    
+    if (bas < 0 || son <= bas) {
+      console.error("Ayıklama Hatası: Köşeli parantez bulunamadı.", text);
+      return null;
+    }
+    
+    const parsed = JSON.parse(temiz.slice(bas, son + 1));
+    if (!Array.isArray(parsed)) return null;
+    
+    const ogeler: YemekOge[] = [];
+    for (const oge of parsed.slice(0, 6)) {
+      const ad = String(oge?.ad ?? "").trim().slice(0, 80);
+      const kcal = Math.round(Number(oge?.kcal));
+      if (!ad || !Number.isFinite(kcal) || kcal < 1 || kcal > 2500) continue;
+      ogeler.push({ ad, kcal });
+    }
+    return ogeler.length ? ogeler : null;
+  } catch (err) {
+    console.error("Ayıklama Çöktü:", err, text);
     return null;
   }
-  const ham = (parsed as { ogeler?: unknown }).ogeler;
-  if (!Array.isArray(ham)) return null;
-  const ogeler: YemekOge[] = [];
-  for (const oge of ham.slice(0, 6)) {
-    const kayit = oge as { ad?: unknown; kcal?: unknown };
-    const ad = String(kayit?.ad ?? "").trim().slice(0, 80);
-    const kcal = Math.round(Number(kayit?.kcal));
-    if (!ad || !Number.isFinite(kcal) || kcal < 1 || kcal > 2500) continue;
-    ogeler.push({ ad, kcal });
-  }
-  return ogeler.length ? ogeler : null;
 }
 
 export async function yemekHesapla({ data }: { data: { metin?: string } }) {
   const metin = String(data?.metin ?? "").trim().slice(0, 300);
   if (!metin) return { ok: false as const, hata: "bos" };
 
-  // Burası Vercel'den senin kendi Groq anahtarını çeker
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!apiKey) {
-    console.error("Groq API Anahtarı bulunamadı!");
+    console.error("HATA: VITE_GROQ_API_KEY bulunamadı!");
     return { ok: false as const, hata: "yok" };
   }
 
@@ -50,42 +53,50 @@ export async function yemekHesapla({ data }: { data: { metin?: string } }) {
         "Authorization": `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "llama3-8b-8192", // En stabil Groq modeli
         temperature: 0.1,
         max_tokens: 500,
         messages: [
           {
             role: "system",
-            content: `Kullanıcının yediği şeyi gerçekçi kaloriye çevir.
-Sadece JSON yaz, başka cümle yok:
-{"ogeler":[{"ad":"kısa Türkçe ad","kcal":123}]}
+            content: `Sen bir kalori hesaplama asistanısın. Kullanıcının yediğini analiz et.
+Cevabın SADECE şu formattaki bir JSON dizisi olmalıdır, başka hiçbir metin veya açıklama yazma:
+[
+  { "ad": "Yemek adı", "kcal": 150 }
+]
+
 Kurallar:
-- Gram, adet ve marka varsa ona göre hesapla.
-- Probis bir proteinli sütlü tatlıdır: 100 gram yaklaşık 110 kcal. 75 gram yaklaşık 80 kcal.
-- Yumurta tanesi yaklaşık 75 kcal. Pilav 100 gram yaklaşık 130 kcal. Tavuk göğsü 100 gram yaklaşık 165 kcal.
-- Birden fazla yiyecek varsa her birini ayrı öğe yap. Toplamı tek satıra yığma.
-- kcal tam sayı, 1 ile 2500 arası. En fazla 6 öğe.
-- Markdown kullanma. Sadece geçerli JSON döndür.`,
+- Probis: 100 gram yaklaşık 110 kcal.
+- Yumurta: yaklaşık 75 kcal. 
+- Porsiyon veya gramaj yoksa standart ölçü kullan.
+- En fazla 6 farklı yemek ekle.
+- Sadece JSON listesi (array) döndür, nesne (object) değil.`
           },
           { role: "user", content: metin },
-        ],
-        response_format: { type: "json_object" }
+        ]
       }),
     });
 
     if (!res.ok) {
-      console.error("API Hatası:", await res.text());
+      const errorText = await res.text();
+      console.error(`API Hatası (${res.status}):`, errorText);
       return { ok: false as const, hata: `http-${res.status}` };
     }
 
     const body = await res.json();
     const textContent = body.choices?.[0]?.message?.content ?? "";
+    console.log("Groq'dan gelen ham cevap:", textContent);
+    
     const ogeler = ayikla(textContent);
     
-    if (!ogeler) return { ok: false as const, hata: "ayiklanamadi" };
+    if (!ogeler) {
+       console.error("Ayıklanamayan Yanıt:", textContent);
+       return { ok: false as const, hata: "ayiklanamadi" };
+    }
+    
     return { ok: true as const, ogeler };
   } catch (err) {
-    console.error("Ağ hatası:", err);
+    console.error("Ağ Hatası:", err);
     return { ok: false as const, hata: "ag" };
   }
 }
