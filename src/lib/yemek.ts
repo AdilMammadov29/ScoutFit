@@ -35,22 +35,22 @@ export async function yemekHesapla({ data }: { data: { metin?: string } }) {
   const metin = String(data?.metin ?? "").trim().slice(0, 300);
   if (!metin) return { ok: false as const, hata: "bos" };
 
+  // Burası Vercel'den senin kendi Groq anahtarını çeker
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!apiKey) {
-    console.error("Groq API Key bulunamadı!");
+    console.error("Groq API Anahtarı bulunamadı!");
     return { ok: false as const, hata: "yok" };
   }
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      signal: AbortSignal.timeout(20000),
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192", // Groq kararlı modeli
+        model: "llama-3.1-8b-instant",
         temperature: 0.1,
         max_tokens: 500,
         messages: [
@@ -61,31 +61,24 @@ Sadece JSON yaz, başka cümle yok:
 {"ogeler":[{"ad":"kısa Türkçe ad","kcal":123}]}
 Kurallar:
 - Gram, adet ve marka varsa ona göre hesapla.
-- Probis bir proteinli sütlü tatlıdır: 100 gram yaklaşık 110 kcal. 75 gram yaklaşık 80 kcal. Protein tozu yazılmadıkça toz kalorisi kullanma.
+- Probis bir proteinli sütlü tatlıdır: 100 gram yaklaşık 110 kcal. 75 gram yaklaşık 80 kcal.
 - Yumurta tanesi yaklaşık 75 kcal. Pilav 100 gram yaklaşık 130 kcal. Tavuk göğsü 100 gram yaklaşık 165 kcal.
 - Birden fazla yiyecek varsa her birini ayrı öğe yap. Toplamı tek satıra yığma.
-- kcal tam sayı, 1 ile 2500 arası.
-- En fazla 6 öğe.
-- Emin olmadığın markada porsiyonu yakın bilinen ürünle tahmin et, kcal'i 0 bırakma.
-- Markdown kullanma. Sadece geçerli bir JSON döndür.`,
+- kcal tam sayı, 1 ile 2500 arası. En fazla 6 öğe.
+- Markdown kullanma. Sadece geçerli JSON döndür.`,
           },
           { role: "user", content: metin },
         ],
-        // Groq API'sinden JSON dönmesini zorluyoruz
         response_format: { type: "json_object" }
       }),
     });
 
     if (!res.ok) {
-      const errBody = await res.text();
-      console.error("yemek hesaplama hatası:", res.status, errBody.slice(0, 300));
+      console.error("API Hatası:", await res.text());
       return { ok: false as const, hata: `http-${res.status}` };
     }
 
-    const body = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    
+    const body = await res.json();
     const textContent = body.choices?.[0]?.message?.content ?? "";
     const ogeler = ayikla(textContent);
     

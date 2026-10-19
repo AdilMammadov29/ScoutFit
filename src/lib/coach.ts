@@ -34,65 +34,62 @@ export function yerelKoc(soru: string, kalori: number): string {
   return `${kalori} kcal hedefini bozmadan sorunu antrenman ya da öğün olarak netleştirirsem daha kısa cevap veririm. Neyi değiştirmek istiyorsun?`;
 }
 
+const MODELLER = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"];
+
 type KocGirdi = { soru: string; baglam?: string };
 
 export async function kocSor({ data }: { data: KocGirdi }) {
-  // 1. Senin çalışan kodundaki gibi güvenli veri temizliği
   const soru = String(data?.soru ?? "").trim().slice(0, 600);
   const baglam = String(data?.baglam ?? "").trim().slice(0, 500);
-
   if (!soru) return { ok: false as const, hata: "bos" };
 
-  // 2. Vite Frontend kuralı: import.meta.env
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-  if (!apiKey) {
-    console.error("API Key eksik!");
-    return { ok: false as const, hata: "api_key_eksik" };
-  }
+  if (!apiKey) return { ok: false as const, hata: "api_key_eksik" };
 
-  try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(25000), // Zaman aşımı eklendi
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey.trim()}` // Boşluklara karşı trim
-      },
-      body: JSON.stringify({
-        model: "llama3-8b-8192", // En sorunsuz Groq modeli
-        temperature: 0.4,
-        max_tokens: 700,
-        messages: [
-          {
-            role: "system",
-            // 3. Groq boş system promptunda 400 atar, bu yüzden yedek metin koyduk
-            content: baglam || "Sen ScoutFit spor ve kalori hesaplama koçusun." 
-          },
-          { 
-            role: "user", 
-            content: soru 
-          }
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error("Groq 400 Detayı:", res.status, errBody.slice(0, 300));
-      return { ok: false as const, hata: `http-${res.status}` };
+  let sonHata = "Groq cevap vermedi";
+  for (const model of MODELLER) {
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        signal: AbortSignal.timeout(25000),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${String(apiKey).trim()}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.4,
+          max_tokens: 700,
+          messages: [
+            {
+              role: "system",
+              content: `Sen ScoutFit koçusun. Türkçe, sakin, kısa ve somut konuş.
+Profil: ${baglam || "profil yok"}.
+Kurallar:
+- Boy veya kilo dökümüyle başlama. Doğrudan soruyu yanıtla.
+- En fazla 90 kelime. Gerekirse en fazla 4 madde.
+- Tıbbi teşhis koyma. Güvenli tempo haftada 0,3–0,7 kg.
+- Emoji kullanma.`,
+            },
+            { role: "user", content: soru },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        sonHata = errBody.slice(0, 300);
+        console.error("Groq", model, res.status, sonHata);
+        continue;
+      }
+      const body = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const text = body.choices?.[0]?.message?.content?.trim() ?? "";
+      if (text) return { ok: true as const, metin: text };
+    } catch (err) {
+      console.error("Groq bağlantı", model, err);
+      sonHata = "ag";
     }
-
-    // 4. Çalışan kodundaki güvenli JSON parçalama yöntemi
-    const body = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const text = body.choices?.[0]?.message?.content?.trim() ?? "";
-    
-    if (!text) return { ok: false as const, hata: "bos-yanit" };
-    return { ok: true as const, metin: text };
-
-  } catch (err) {
-    console.error("Groq Bağlantı Hatası:", err);
-    return { ok: false as const, hata: "ag" };
   }
+  return { ok: false as const, hata: sonHata };
 }
