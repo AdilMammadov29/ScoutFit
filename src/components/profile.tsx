@@ -6,7 +6,7 @@ import { useEkstra, type Birim, type KiloKaydi } from "../lib/extras";
 import type { Section } from "./shell";
 import { Btn, PageTitle, Panel, Row } from "./ui";
 import { tumVeriyiSifirla } from "@/lib/sync";
-// Eğer bu tipleri Grok dosyalarında (store.ts ve extras.ts) "export" ederek tanımladıysa:
+
 const LB = 2.20462;
 const alanClass =
   "min-h-11 w-full rounded-xl border border-line bg-cream px-3 text-sm text-ink outline-none focus:border-pine";
@@ -145,37 +145,40 @@ function HesapPanel() {
         <div className="flex flex-wrap gap-3 pt-2">
           <Btn tone="quiet" onClick={() => logout()}>Çıkış Yap / Yeni Hesap</Btn>
           <Btn tone="quiet" onClick={() => {
-  if (window.confirm(`"${currentUser.name}" adlı bu hesabı cihazdan kalıcı olarak silmek istediğine emin misin?`)) {
-    removeAccount(currentUser.id); // Aktif olan hesabın ID'sini siliyoruz
-  }
-}}>Hesabı Sil</Btn>
+            if (window.confirm(`"${currentUser.name}" adlı bu hesabı cihazdan kalıcı olarak silmek istediğine emin misin?`)) {
+              removeAccount(currentUser.id);
+            }
+          }}>Hesabı Sil</Btn>
         </div>
       </div>
     </Panel>
   );
 }
+
 function KiloGrafik({
   kayitlar,
   hedef,
   birim,
+  guncelKilo,
 }: {
   kayitlar: KiloKaydi[];
   hedef?: number;
   birim: Birim;
+  guncelKilo?: number;
 }) {
-  if (kayitlar.length < 2) {
-    return <p className="py-4 text-sm text-muted">Grafik için en az iki günlük kayıt gerekir.</p>;
-  }
+  const aktifKayitlar = kayitlar.length > 0 ? kayitlar : [{ id: "varsayilan", kilo: guncelKilo ?? 75, tarih: new Date().toISOString() }];
+
   const W = 560;
   const H = 200;
   const P = 32;
   const dono = (kg: number) => (birim === "lb" ? kg * LB : kg);
-  const degerler = kayitlar.map((k) => dono(k.kilo));
+  const degerler = aktifKayitlar.map((k) => dono(k.kilo));
   const hedefD = hedef !== undefined ? dono(hedef) : undefined;
   const tum = hedefD !== undefined ? [...degerler, hedefD] : degerler;
   const min = Math.min(...tum) - 1;
   const max = Math.max(...tum) + 1;
-  const x = (i: number) => P + (i * (W - 2 * P)) / (kayitlar.length - 1);
+  
+  const x = (i: number) => aktifKayitlar.length === 1 ? W / 2 : P + (i * (W - 2 * P)) / (aktifKayitlar.length - 1);
   const y = (v: number) => H - P - ((v - min) / (max - min)) * (H - 2 * P);
   const nokta = degerler.map((v, i) => `${x(i)},${y(v)}`).join(" ");
 
@@ -201,19 +204,19 @@ function KiloGrafik({
       />
       {degerler.map((v, i) => (
         <circle
-          key={kayitlar[i].id}
+          key={aktifKayitlar[i].id}
           cx={x(i)}
           cy={y(v)}
-          r={3.5}
+          r={4}
           fill="currentColor"
           className="text-pine"
         />
       ))}
       <text x={P} y={H - 8} className="fill-muted text-[10px]">
-        {tarihKisa(kayitlar[0].tarih)}
+        {tarihKisa(aktifKayitlar[0].tarih)}
       </text>
       <text x={W - P} y={H - 8} textAnchor="end" className="fill-muted text-[10px]">
-        {tarihKisa(kayitlar[kayitlar.length - 1].tarih)}
+        {tarihKisa(aktifKayitlar[aktifKayitlar.length - 1].tarih)}
       </text>
       <text x={P} y={14} className="fill-muted text-[10px]">
         {sayiYaz(max)} {birim}
@@ -224,7 +227,7 @@ function KiloGrafik({
 
 function KiloPanel() {
   const profil = useFit((s) => s.profil);
-  const kayitlar = useEkstra((s: any) => s.kiloKayitlari);
+  const kayitlar = useEkstra((s: any) => s.kiloKayitlari) || [];
   const birim = useEkstra((s :any) => s.birim);
   const ekleKilo = useEkstra((s:any) => s.ekleKilo);
   const silKilo = useEkstra((s:any) => s.silKilo);
@@ -248,7 +251,7 @@ function KiloPanel() {
 
   return (
     <Panel title="Kilo takibi">
-      <KiloGrafik kayitlar={kayitlar} hedef={profil?.hedefKilo} birim={birim} />
+      <KiloGrafik kayitlar={kayitlar} hedef={profil?.hedefKilo} birim={birim} guncelKilo={profil?.kilo} />
       {kayitlar.length >= 2 ? (
         <Row label="Toplam değişim" value={`${fark > 0 ? "+" : ""}${sayiYaz(fark)} ${birim}`} />
       ) : null}
@@ -287,7 +290,7 @@ function KiloPanel() {
           ))}
         </ul>
       ) : (
-        <p className="pb-5 text-sm text-muted">Henüz kayıt yok. İlk kilonu ekle.</p>
+        <p className="pb-5 text-sm text-muted">Henüz geçmiş kayıt yok. Profilindeki kilo baz alınıyor.</p>
       )}
     </Panel>
   );
@@ -306,7 +309,7 @@ function AyarPanel() {
     if (window.confirm(mesaj)) islem();
   };
 
-    const hepsiniSifirla = sor(
+  const hepsiniSifirla = sor(
     "Profil, antrenmanlar, sohbet, öğünler ve kilo kayıtları dahil hesabındaki tüm veriler silinecek. Emin misin?",
     tumVeriyiSifirla,
   );
