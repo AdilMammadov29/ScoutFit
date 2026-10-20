@@ -20,9 +20,9 @@ export const AKTIVITE_ETIKET: Record<Aktivite, string> = {
 };
 
 export const HEDEF_ETIKET: Record<HedefSecim, string> = {
-  yag_yakimi: "Yağ yakımı",
-  kas_kutlesi: "Kas kütlesi",
-  koruma: "Koruma",
+  yag_yakimi: "Yağ Yakımı (Defisit)",
+  kas_kutlesi: "Kilo Alma & Kas Kütlesi (Hacim)",
+  koruma: "Kilo Koruma",
 };
 
 export const MOTOR_ETIKET: Record<MotorHedef, string> = {
@@ -87,8 +87,13 @@ function roundTo(n: number, digits: number) {
 }
 
 export function motorHedef(hedef: HedefSecim, kilo: number, hedefKilo: number): MotorHedef {
-  if (hedef === "yag_yakimi" || hedefKilo < kilo) return "kilo_verme";
-  if (hedef === "kas_kutlesi" || hedefKilo > kilo) return "kilo_alma";
+  if (hedef === "yag_yakimi") return "kilo_verme";
+  if (hedef === "kas_kutlesi") return "kilo_alma";
+  if (hedef === "koruma") {
+    if (hedefKilo > kilo + 0.5) return "kilo_alma";
+    if (hedefKilo < kilo - 0.5) return "kilo_verme";
+    return "koruma";
+  }
   return "koruma";
 }
 
@@ -100,10 +105,10 @@ export function hesapla(girdi: Girdi): Sonuc {
       ? girdi.hedef
       : "koruma";
 
-  const boyCm = Number.isFinite(girdi.boyCm) ? girdi.boyCm : 180;
-  const kiloKg = Number.isFinite(girdi.kiloKg) ? girdi.kiloKg : 80;
-  const hedefKiloKg = Number.isFinite(girdi.hedefKiloKg) ? girdi.hedefKiloKg : kiloKg;
-  const yas = Number.isFinite(girdi.yas) ? girdi.yas : 30;
+  const boyCm = Number.isFinite(girdi.boyCm) && girdi.boyCm > 0 ? girdi.boyCm : 180;
+  const kiloKg = Number.isFinite(girdi.kiloKg) && girdi.kiloKg > 0 ? girdi.kiloKg : 75;
+  const hedefKiloKg = Number.isFinite(girdi.hedefKiloKg) && girdi.hedefKiloKg > 0 ? girdi.hedefKiloKg : kiloKg;
+  const yas = Number.isFinite(girdi.yas) && girdi.yas > 0 ? girdi.yas : 25;
   const uyarilar: string[] = [];
 
   const farkKg = hedefKiloKg - kiloKg;
@@ -115,16 +120,18 @@ export function hesapla(girdi: Girdi): Sonuc {
   const tdee = bmr * AKTIVITE_CARPAN[aktivite];
 
   let farkKcal: number;
-  if (hedef === "koruma" || Math.abs(farkKg) < 0.5) {
+  if (hedef === "koruma") {
     farkKcal = 0;
-    hedef = "koruma";
-  } else if (hedef === "kilo_verme" || farkKg < 0) {
-    hedef = "kilo_verme";
-    const acik = Math.min(750, Math.max(300, Math.abs(farkKg) * 35));
+  } else if (hedef === "kilo_verme") {
+    const acik = Math.abs(farkKg) >= 0.5 
+      ? Math.min(750, Math.max(300, Math.abs(farkKg) * 35))
+      : 400; // Hedef kilo girilmemişse standart 400 kcal kalori açığı
     farkKcal = -acik;
   } else {
-    hedef = "kilo_alma";
-    const fazla = Math.min(500, Math.max(250, Math.abs(farkKg) * 25));
+    // Kilo alma & Kas Kütlesi (Surplus)
+    const fazla = Math.abs(farkKg) >= 0.5 
+      ? Math.min(500, Math.max(250, Math.abs(farkKg) * 25))
+      : 350; // Hedef kilo girilmemişse standart +350 kcal temiz hacim fazlalığı
     farkKcal = fazla;
   }
 
@@ -137,12 +144,12 @@ export function hesapla(girdi: Girdi): Sonuc {
   farkKcal = hedefKcal - tdee;
 
   const refKilo = hedef === "kilo_verme" && bmi >= 30 ? hedefKiloKg : kiloKg;
-  const proteinPerKg = { kilo_verme: 2.2, kilo_alma: 1.8, koruma: 1.6 }[hedef];
+  const proteinPerKg = { kilo_verme: 2.2, kilo_alma: 1.9, koruma: 1.6 }[hedef];
   let proteinG = proteinPerKg * refKilo;
-  let yagG = Math.max((0.25 * hedefKcal) / FAT_KCAL, 0.6 * refKilo);
+  let yagG = Math.max((0.25 * hedefKcal) / FAT_KCAL, 0.7 * refKilo);
   let karbKcal = hedefKcal - proteinG * PROTEIN_KCAL - yagG * FAT_KCAL;
 
-  const minKarbG = 100;
+  const minKarbG = 120;
   if (karbKcal / CARB_KCAL < minKarbG) {
     let eksik = minKarbG * CARB_KCAL - karbKcal;
     const yagKullan = Math.max(0, yagG - 0.6 * refKilo);
@@ -164,7 +171,7 @@ export function hesapla(girdi: Girdi): Sonuc {
 
   const haftalikKg = (farkKcal * 7) / KCAL_PER_KG;
   let sureHafta: number | null = null;
-  if (hedef !== "koruma" && Math.abs(haftalikKg) > 1e-6) {
+  if (hedef !== "koruma" && Math.abs(farkKg) >= 0.5 && Math.abs(haftalikKg) > 1e-6) {
     sureHafta = roundTo(Math.abs(farkKg / haftalikKg), 1);
   }
 
