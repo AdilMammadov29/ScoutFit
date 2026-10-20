@@ -99,10 +99,10 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
   return (
     <div className="space-y-6">
       <PageTitle
-        baslik="Beslenme & Öğün Takibi"
-        aciklama="Günlük kalori bütçeni kontrol et, pratik butonlarla veya serbestçe öğünlerini kaydet."
+        index="04"
+        title="Beslenme & Öğün Takibi"
+        lede="Günlük kalori bütçeni kontrol et, pratik butonlarla veya serbestçe öğünlerini kaydet."
       />
-
       {/* Günlük Kalori Durum Özeti */}
       <div className="grid grid-cols-3 gap-3 rounded-2xl border border-line bg-cream p-4 text-center">
         <div>
