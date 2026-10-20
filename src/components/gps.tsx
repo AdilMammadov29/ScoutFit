@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { useFit } from "@/lib/store";
 
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
@@ -39,17 +40,35 @@ function mesafeHesapla(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 export function GpsTracker() {
+  const ekleAntrenman = useFit((s: any) => s.ekleAntrenman);
+
   const [aktif, setAktif] = useState(false);
   const [sure, setSure] = useState(0);
   const [mesafe, setMesafe] = useState(0);
   const [hiz, setHiz] = useState(0);
   const [rota, setRota] = useState<Array<[number, number]>>([]);
   const [simdikiKonum, setSimdikiKonum] = useState<[number, number]>([37.7648, 30.5566]);
-  const [aktiviteler, setAktiviteler] = useState<any[]>([]);
+
+  // Sayfa yenilendiğinde verilerin silinmemesi için localStorage başlangıcı
+  const [aktiviteler, setAktiviteler] = useState<any[]>(() => {
+    try {
+      const kayitli = localStorage.getItem("scoutfit_gps_aktiviteler");
+      return kayitli ? JSON.parse(kayitli) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [hata, setHata] = useState<string | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
   const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("scoutfit_gps_aktiviteler", JSON.stringify(aktiviteler));
+    } catch {}
+  }, [aktiviteler]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -71,9 +90,7 @@ export function GpsTracker() {
     };
   }, [aktif]);
 
-  // Mesafe üzerinden kusursuz adım hesaba (1 km = ~1350 adım)
   const hesaplananAdim = Math.round(mesafe * 1350);
-  // Yakılan kalori hesaba (Ortalama 1 km yürüyüş = ~65 kcal)
   const harcananKalori = Math.round(mesafe * 65);
 
   const antrenmaniBaslat = () => {
@@ -111,7 +128,7 @@ export function GpsTracker() {
     );
   };
 
-  const antrenmaniBitir = () => {
+const antrenmaniBitir = () => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -120,7 +137,7 @@ export function GpsTracker() {
 
     if (mesafe > 0 || sure > 5) {
       const yeniAktivite = {
-        id: Date.now(),
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
         tarih: new Date().toLocaleDateString("tr-TR"),
         sure,
         mesafe,
@@ -128,7 +145,17 @@ export function GpsTracker() {
         kalori: harcananKalori,
         ortalamaHiz: sure > 0 ? (mesafe / (sure / 3600)).toFixed(1) : 0,
       };
+
       setAktiviteler((prev) => [yeniAktivite, ...prev]);
+
+      // Zustand store'daki Taslak tipine tam uyumlu kayıt:
+      if (typeof ekleAntrenman === "function") {
+        ekleAntrenman({
+          bolge: "Yürüyüş / Koşu (GPS)",
+          hareketler: `${mesafe} km, ${hesaplananAdim} adım, ~${harcananKalori} kcal`,
+          sureDk: Math.max(1, Math.round(sure / 60)),
+        });
+      }
     }
   };
 
@@ -143,7 +170,7 @@ export function GpsTracker() {
     <div className="mx-auto max-w-4xl p-6 text-white space-y-6">
       <div className="flex flex-col gap-2">
         <h2 className="text-3xl font-extrabold tracking-tight text-[#6f9f87]">GPS Rota & Adım Takibi</h2>
-        <p className="text-sm text-gray-400">Başlat düğmesine bas, rotan haritada çizilsin; mesafen ve adımların kusursuz hesaplansın.</p>
+        <p className="text-sm text-gray-400">Başlat düğmesine bas, rotan haritada çizilsin; mesafen ve adımların hesaplansın.</p>
       </div>
 
       {hata && (
@@ -165,7 +192,7 @@ export function GpsTracker() {
         </MapContainer>
       </div>
 
-      {/* İSTATİSTİK KARTLARI (ADIM VE KALORİ DAHİL) */}
+      {/* İSTATİSTİK KARTLARI */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
           <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Mesafe</span>
