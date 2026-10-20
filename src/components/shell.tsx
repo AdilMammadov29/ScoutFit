@@ -10,24 +10,22 @@ import { useAuth } from "../lib/authStore";
 import { AuthView } from "./auth";
 import { supabase } from "@/lib/supabase";
 import { bulutuDurdur } from "@/lib/sync";
-import { useI18n } from "@/lib/i18n";
 
 export type Section = "today" | "goal" | "train" | "meals" | "coach" | "profile" | "gps";
+
+const NAV: { id: Section; no: string; ad: string }[] = [
+  { id: "today", no: "01", ad: "Bugün" },
+  { id: "goal", no: "02", ad: "Hedef" },
+  { id: "train", no: "03", ad: "Antrenman" },
+  { id: "meals", no: "04", ad: "Beslenme" },
+  { id: "gps", no: "05", ad: "GPS & Rota" },
+  { id: "coach", no: "06", ad: "Koç" },
+];
 
 export function ScoutApp() {
   const currentUser = useAuth((s: any) => s.currentUser);
   const [section, setSection] = useState<Section>("today");
   const [menuOpen, setMenuOpen] = useState(false);
-  const { dil, diliDegistir, t } = useI18n();
-
-  const NAV: { id: Section; no: string; ad: string }[] = [
-    { id: "today", no: "01", ad: t.nav.today },
-    { id: "goal", no: "02", ad: t.nav.goal },
-    { id: "train", no: "03", ad: t.nav.train },
-    { id: "meals", no: "04", ad: t.nav.meals },
-    { id: "gps", no: "05", ad: t.nav.gps },
-    { id: "coach", no: "06", ad: t.nav.coach },
-  ];
 
   const handleCikis = async () => {
     bulutuDurdur();
@@ -40,7 +38,7 @@ export function ScoutApp() {
   }
 
   const kullaniciAdi = typeof currentUser === "string" ? currentUser : currentUser.name || "Kullanıcı";
-  const basHarf = kullaniciAdi.charAt(0).toUpperCase();
+  const basHarf = (kullaniciAdi.charAt(0) || "U").toUpperCase();
 
   return (
     <div className="min-h-dvh bg-paper text-ink flex flex-col font-sans">
@@ -57,15 +55,6 @@ export function ScoutApp() {
         </div>
         
         <div className="flex items-center gap-3">
-          {/* Dil Değiştirici Butonu */}
-          <button
-            onClick={() => diliDegistir(dil === "tr" ? "en" : "tr")}
-            className="flex items-center gap-1.5 rounded-xl border border-line bg-cream px-3 py-1.5 font-mono text-xs font-bold text-ink hover:border-pine transition active:scale-95"
-            title="Dili Değiştir / Change Language"
-          >
-            <span>{dil === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
-          </button>
-
           <button
             onClick={() => setSection("profile")}
             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all hover:scale-105 active:scale-95 ${
@@ -75,15 +64,15 @@ export function ScoutApp() {
             }`}
             title={`Profil (${kullaniciAdi})`}
           >
-            {basariHarfi(basHarf)}
+            {basHarf}
           </button>
 
           <button
             onClick={handleCikis}
             className="rounded-xl border border-line bg-cream px-3 py-2 text-xs font-semibold text-muted hover:border-clay/50 hover:text-clay transition-all active:scale-95"
-            title={t.nav.logout}
+            title="Çıkış Yap"
           >
-            {t.nav.logout}
+            Çıkış Yap
           </button>
         </div>
       </header>
@@ -105,8 +94,8 @@ export function ScoutApp() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-display text-2xl font-bold text-ink md:block hidden">ScoutFit</p>
-                <p className="mt-1 hidden text-xs leading-relaxed text-muted md:block">{t.nav.subtitle}</p>
-                <p className="font-display text-xl font-bold text-ink md:hidden">{t.nav.menu}</p>
+                <p className="mt-1 hidden text-xs leading-relaxed text-muted md:block">Kişisel antrenman defteri.</p>
+                <p className="font-display text-xl font-bold text-ink md:hidden">Menü</p>
               </div>
               <button 
                 className="text-2xl text-muted hover:text-ink md:hidden" 
@@ -146,7 +135,7 @@ export function ScoutApp() {
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-semibold text-muted hover:bg-clay/10 hover:text-clay transition-colors"
             >
               <span>🚪</span>
-              <span>{t.nav.logout}</span>
+              <span>Çıkış Yap</span>
             </button>
           </div>
         </aside>
@@ -159,10 +148,6 @@ export function ScoutApp() {
       </div>
     </div>
   );
-}
-
-function basariHarfi(harf: string) {
-  return harf || "U";
 }
 
 function Icerik({ section, git }: { section: Section; git: (s: Section) => void }) {

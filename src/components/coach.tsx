@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { PageTitle, Panel, Btn } from "./ui";
-import { useI18n } from "@/lib/i18n";
+import { PageTitle, Panel } from "./ui";
 import { useFit } from "@/lib/store";
 import { useOgun } from "@/lib/ogun";
 
 export function CoachView() {
-  const { dil, t } = useI18n();
   const profil = useFit((s) => s.profil);
   const ogunler = useOgun((s) => s.ogunler);
 
@@ -17,53 +15,33 @@ export function CoachView() {
     setTavsiye(null);
 
     setTimeout(() => {
-      if (dil === "en") {
-        if (tip === "kacirma") {
-          setTavsiye(
-            "Don't worry about missing a session. Keep today's calorie intake at maintenance level. Tomorrow, combine your major compound lifts (Chest & Back or Squat & Shoulders) into a 45-minute focused session with 3 sets per movement."
-          );
-        } else if (tip === "kacamak") {
-          setTavsiye(
-            "A cheat meal will not ruin your progress. Drink at least 3.5 liters of water today to flush excess sodium. Deduct 200 kcal from carbohydrates over the next two days, and add a brisk 25-minute walk (approx. 200 kcal burn)."
-          );
-        } else if (tip === "yorgunluk") {
-          setTavsiye(
-            "Central nervous system fatigue detected. Skip heavy 1-5 rep max attempts today. Perform a deload session: reduce working weights by 30%, focus on slow tempo (3 seconds eccentric), and get at least 8 hours of sleep."
-          );
-        } else {
-          setTavsiye(
-            "Daily metrics reset. Hydration target set to 3L. Aim for 2.0g protein per kg of bodyweight, prioritize high-fiber vegetables, and get ready for your scheduled training split tomorrow."
-          );
-        }
+      if (tip === "kacirma") {
+        setTavsiye(
+          "Bir antrenmanı kaçırmak hiçbir şeyi bozmaz. Bugünkü kalori alımını bakım seviyesinde tut. Yarın ana bileşik hareketlerini (Göğüs-Sırt veya Bacak-Omuz) birleştirerek 45 dakikalık, hareket başına 3 setlik yoğun bir telafi antrenmanı yap."
+        );
+      } else if (tip === "kacamak") {
+        setTavsiye(
+          "Kaçamak kilo yapmaz, sadece su tutar. Bugün en az 3.5 litre su içerek sodyumu at. Önümüzdeki 2 gün karbonhidratı porsiyon başına 30-40g kıs ve günlük adımlarına 25 dakikalık tempolu yürüyüş ekle."
+        );
+      } else if (tip === "yorgunluk") {
+        setTavsiye(
+          "Merkezi sinir sistemi yorgunluğu tespit edildi. Bugün tükenişe (RPE 10) gitme. Ağırlıkları %30 düşürerek kan akışını artıran hafif bir 'deload' seansı yap ve bu gece 8 saat deliksiz uyu."
+        );
       } else {
-        if (tip === "kacirma") {
-          setTavsiye(
-            "Bir antrenmanı kaçırmak hiçbir şeyi bozmaz. Bugünkü kalori alımını bakım seviyesinde tut. Yarın ana bileşik hareketlerini (Göğüs-Sırt veya Bacak-Omuz) birleştirerek 45 dakikalık, hareket başına 3 setlik yoğun bir telafi antrenmanı yap."
-          );
-        } else if (tip === "kacamak") {
-          setTavsiye(
-            "Kaçamak kilo yapmaz, sadece su tutar. Bugün en az 3.5 litre su içerek sodyumu at. Önümüzdeki 2 gün karbonhidratı porsiyon başına 30-40g kıs ve günlük adımlarına 25 dakikalık tempolu yürüyüş ekle."
-          );
-        } else if (tip === "yorgunluk") {
-          setTavsiye(
-            "Merkezi sinir sistemi yorgunluğu tespit edildi. Bugün tükenişe (RPE 10) gitme. Ağırlıkları %30 düşürerek kan akışını artıran hafif bir 'deload' seansı yap ve bu gece 8 saat deliksiz uyu."
-          );
-        } else {
-          setTavsiye(
-            "Günün dengelendi. Su hedefin 3 litre. Vücut ağırlığının 2 katı protein almaya odaklan, lifli sebzelere öncelik ver ve yarınki antrenmanına sıfırdan odaklan."
-          );
-        }
+        setTavsiye(
+          "Günün dengelendi. Su hedefin 3 litre. Vücut ağırlığının 2 katı protein almaya odaklan, lifli sebzelere öncelik ver ve yarınki antrenmanına sıfırdan odaklan."
+        );
       }
       setYukleniyor(false);
-    }, 450);
+    }, 350);
   };
 
   return (
     <div className="space-y-6">
       <PageTitle
         index="06"
-        title={t.coach.title}
-        lede={t.coach.subtitle}
+        title="ScoutFit AI Koç"
+        lede="Performans, beslenme ve telafi asistanın."
       />
 
       {/* Koç Durum Rozeti */}
@@ -73,18 +51,18 @@ export function CoachView() {
             <span className="absolute h-3 w-3 rounded-full bg-pine opacity-75 animate-ping" />
             <span className="relative h-2 w-2 rounded-full bg-pine" />
           </div>
-          <span className="text-xs font-semibold text-ink">{t.coach.statusReady}</span>
+          <span className="text-xs font-semibold text-ink">Koç hazır, durumunu analiz ediyor</span>
         </div>
-        <span className="text-xs font-mono text-muted uppercase">
-          {dil === "en" ? "Live Analysis" : "Canlı Analiz"}
-        </span>
+        <span className="text-xs font-mono text-muted uppercase">Canlı Analiz</span>
       </div>
 
       {/* Kaçamak / Telafi Butonları */}
       <Panel>
         <div className="p-6">
-          <h3 className="text-sm font-bold text-ink">{t.coach.cheatTitle}</h3>
-          <p className="mt-1 text-xs text-muted leading-relaxed">{t.coach.cheatDesc}</p>
+          <h3 className="text-sm font-bold text-ink">Hızlı Durum & Kaçamak Bildirimi</h3>
+          <p className="mt-1 text-xs text-muted leading-relaxed">
+            Hedefinin dışına çıktıysan endişelenme, durumunu seç ve dengeleme planını al:
+          </p>
 
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
@@ -92,7 +70,7 @@ export function CoachView() {
               disabled={yukleniyor}
               className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
             >
-              {t.coach.btnMissedWorkout}
+              🏋️‍♂️ Antrenmanı Kaçırdım
             </button>
 
             <button
@@ -100,7 +78,7 @@ export function CoachView() {
               disabled={yukleniyor}
               className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
             >
-              {t.coach.btnAteTooMuch}
+              🍕 Fazla Kalori / Kaçamak Yaptım
             </button>
 
             <button
@@ -108,7 +86,7 @@ export function CoachView() {
               disabled={yukleniyor}
               className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
             >
-              {t.coach.btnLowEnergy}
+              ⚡ Enerjim Düşük / Yorgunum
             </button>
 
             <button
@@ -116,7 +94,7 @@ export function CoachView() {
               disabled={yukleniyor}
               className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
             >
-              {t.coach.btnResetDay}
+              🔄 Günü Dengele & Sıfırla
             </button>
           </div>
         </div>
@@ -127,11 +105,11 @@ export function CoachView() {
         <div className="p-6">
           <div className="flex items-center justify-between border-b border-line pb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-pine">
-              {t.coach.recentAdvice}
+              Koçun Stratejisi & Tavsiyeleri
             </span>
             {yukleniyor && (
               <span className="text-xs font-mono text-muted animate-pulse">
-                {t.coach.aiThinking}
+                Koç senin için en iyi stratejiyi hesaplıyor...
               </span>
             )}
           </div>
@@ -139,14 +117,12 @@ export function CoachView() {
           <div className="mt-4">
             {tavsiye ? (
               <div className="rounded-2xl border border-pine/30 bg-pine/10 p-5 text-xs leading-relaxed text-ink font-medium animate-fade-in">
-                <span className="font-bold text-pine block mb-1">
-                  {dil === "en" ? "💡 Protocol:" : "💡 Çözüm Protokolü:"}
-                </span>
+                <span className="font-bold text-pine block mb-1">💡 Çözüm Protokolü:</span>
                 {tavsiye}
               </div>
             ) : (
               <p className="py-6 text-center text-xs text-muted leading-relaxed">
-                {t.coach.emptyAdvice}
+                Yukarıdaki butonlardan bir durum seç, telafi stratejisi hemen oluşturulsun.
               </p>
             )}
           </div>
