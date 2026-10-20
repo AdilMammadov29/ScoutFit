@@ -1,115 +1,224 @@
-import { useState, type FormEvent } from "react";
-import { kocSor } from "@/lib/coach";
-import { profildenHesap } from "@/lib/engine";
+import { useState, useRef } from "react";
+import { fmtKcal, profildenHesap } from "@/lib/engine";
+import { kocSor, yerelKoc } from "@/lib/coach";
 import { useFit } from "@/lib/store";
-import { Btn, PageTitle, Panel } from "@/components/ui";
+import { useAuth } from "@/lib/authStore";
+import { PageTitle } from "@/components/ui";
 
-const ONERILER = [
-  "Bugün antrenmanı kaçırdım, ne yapayım?",
-  "Akşam biraz fazla kaçırdım, telafisi var mı?",
-  "Göğüs gününde hangi hareketleri yapayım?",
-  "Kilo vermem durdu, neyi değiştireyim?",
+const HAZIR = [
+  "Göğüs antrenmanı nasıl olmalı?",
+  "Bu kaloriyle ne yemeliyim?",
+  "Haftalık tempo gerçekçi mi?",
 ];
 
 export function CoachView() {
   const profil = useFit((s) => s.profil);
-  const h = profil ? profildenHesap(profil) : null;
+  const antrenmanlar = useFit((s) => s.antrenmanlar);
+  const sohbet = useFit((s) => s.sohbet);
+  const ekleMesaj = useFit((s) => s.ekleMesaj);
+  const temizle = useFit((s) => s.temizleSohbet);
 
-  const [soru, setSoru] = useState("");
-  const [cevap, setCevap] = useState<string | null>(null);
-  const [hata, setHata] = useState<string | null>(null);
-  const [yukleniyor, setYukleniyor] = useState(false);
+  const currentUser = useAuth((s) => s.currentUser);
+  const kullaniciAdi = currentUser?.name || "Sporcu";
 
-  async function sor(metin: string) {
-    const s = metin.trim();
-    if (!s || yukleniyor) return;
+  const [taslak, setTaslak] = useState("");
+  const [yaziyor, setYaziyor] = useState(false);
+  const [dinliyor, setDinliyor] = useState(false);
 
-    setYukleniyor(true);
-    setHata(null);
+  const kalori = profil ? profildenHesap(profil).gunlukKalori : 2100;
 
-    const baglam = profil && h
-      ? `Kilo: ${profil.kilo}kg, Hedef Kilo: ${profil.hedefKilo}kg, Günlük Kalori: ${h.gunlukKalori} kcal`
-      : "";
-
-    try {
-      const res = await kocSor({ data: { soru: s, baglam } });
-      if (res.ok) {
-        setCevap(res.metin);
-      } else {
-        setHata("Koç şu an yanıt veremiyor. Lütfen tekrar dene.");
-      }
-    } catch {
-      setHata("Bağlantı kurulamadı.");
-    } finally {
-      setYukleniyor(false);
-    }
+  function baglam() {
+    const temelBilgi = `Kullanıcının adı: ${kullaniciAdi}.`;
+    if (!profil) return `${temelBilgi} Profil henüz kaydedilmedi.`;
+    const h = profildenHesap(profil);
+    const son = antrenmanlar
+      .slice(0, 3)
+      .map((a) => a.bolge)
+      .join(", ");
+    return `${temelBilgi} Kilo ${profil.kilo} kg, hedef ${profil.hedefKilo} kg, ${h.gunlukKalori} kcal, protein ${h.proteinG} g, karb ${h.karbonhidratG} g, yağ ${h.yagG} g. Son antrenmanlar: ${son || "yok"}.`;
   }
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    sor(soru);
+  // Sesli Asistan (Mikrofon) Entegrasyonu
+  const sesliDinleBaslat = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "tr-TR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setDinliyor(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const sesMetni = event.results[0][0].transcript;
+      setTaslak(sesMetni);
+      setDinliyor(false);
+    };
+
+    recognition.onerror = () => {
+      setDinliyor(false);
+    };
+
+    recognition.onend = () => {
+      setDinliyor(false);
+    };
+
+    recognition.start();
+  };
+
+  async function gonder(metin: string) {
+    const soru = metin.trim();
+    if (!soru || yaziyor) return;
+    setTaslak("");
+    ekleMesaj({ id: crypto.randomUUID(), rol: "kullanici", metin: soru });
+    setYaziyor(true);
+    let yanit = "";
+    let yerel = false;
+    try {
+      const sonuc = await kocSor({ data: { soru, baglam: baglam() } });
+      if (sonuc.ok) yanit = sonuc.metin;
+      else {
+        yanit = yerelKoc(soru, kalori);
+        yerel = true;
+      }
+    } catch {
+      yanit = yerelKoc(soru, kalori);
+      yerel = true;
+    }
+    ekleMesaj({ id: crypto.randomUUID(), rol: "koc", metin: yanit, yerel });
+    setYaziyor(false);
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageTitle
-        index="06"
+        index="05"
         title="Koç"
-        lede="Antrenman, beslenme veya tempo hakkında aklına takılanı sor."
+        lede={`Merhaba ${kullaniciAdi}, kısa sor. Cevap tek balonda durur.`}
       />
 
-      <Panel>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-2">
-              Koça Sor
-            </label>
-            <textarea
-              rows={3}
-              value={soru}
-              onChange={(e) => setSoru(e.target.value)}
-              placeholder="Örn: Bacak çalışırken dizim hafif ağrıyor, ne yapmalıyım?"
-              className="w-full resize-none rounded-2xl border border-line bg-cream p-4 text-sm text-ink outline-none transition focus:border-pine"
-            />
-          </div>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-muted">{profil ? `${fmtKcal(kalori)} kcal hedefi bağlı` : "Hedef kaydı yok"}</p>
+        {sohbet.length > 0 ? (
+          <button type="button" onClick={temizle} className="min-h-11 text-sm text-muted">
+            Sohbeti sil
+          </button>
+        ) : null}
+      </div>
 
-          <div className="flex flex-wrap gap-2">
-            {ONERILER.map((oneri) => (
-              <button
-                key={oneri}
-                type="button"
-                onClick={() => {
-                  setSoru(oneri);
-                  sor(oneri);
-                }}
-                className="rounded-xl border border-line bg-paper px-3 py-1.5 text-xs text-muted transition hover:border-pine hover:text-ink active:scale-95"
-              >
-                {oneri}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <Btn type="submit" disabled={yukleniyor || !soru.trim()}>
-              {yukleniyor ? "Koç Yanıtlıyor..." : "Sor"}
-            </Btn>
-          </div>
-        </form>
-      </Panel>
-
-      {hata && (
-        <div className="rounded-2xl border border-clay/30 bg-clay/10 p-4 text-xs text-clay">
-          {hata}
+      {sohbet.length === 0 && !yaziyor ? (
+        <div className="mb-6 flex flex-col gap-2">
+          {HAZIR.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => gonder(s)}
+              className="min-h-11 rounded-xl border border-line bg-cream px-4 text-left text-sm text-ink"
+            >
+              {s}
+            </button>
+          ))}
         </div>
-      )}
+      ) : null}
 
-      {cevap && (
-        <Panel title="Koçun Yanıtı">
-          <div className="whitespace-pre-line text-sm leading-relaxed text-ink py-2">
-            {cevap}
-          </div>
-        </Panel>
-      )}
+      <ol className="space-y-3">
+        {sohbet.map((m) => (
+          <li key={m.id} className={m.rol === "kullanici" ? "ml-10" : "mr-10"}>
+            <div
+              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                m.rol === "kullanici" ? "bg-pine text-cream" : "border border-line bg-cream text-ink"
+              }`}
+            >
+              <Metin metin={m.metin} />
+            </div>
+            {m.yerel ? <p className="mt-1 text-xs text-muted">Yerel yanıt</p> : null}
+          </li>
+        ))}
+        {yaziyor ? (
+          <li className="mr-10">
+            <div className="rounded-2xl border border-line bg-cream px-4 py-3 text-sm text-muted">
+              Yazıyor...
+            </div>
+          </li>
+        ) : null}
+      </ol>
+
+      <form
+        className="mt-6 flex items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void gonder(taslak);
+        }}
+      >
+        {/* MİKROFON BUTONU */}
+        <button
+          type="button"
+          onClick={sesliDinleBaslat}
+          className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-base transition-all ${
+            dinliyor ? "bg-red-500 text-white animate-pulse" : "bg-cream text-ink hover:bg-line/20"
+          }`}
+          title="Sesli Sor"
+        >
+          🎙️
+        </button>
+
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">Sorun</span>
+          <textarea
+            value={taslak}
+            rows={2}
+            onChange={(e) => setTaslak(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void gonder(taslak);
+              }
+            }}
+            placeholder={dinliyor ? "Dinliyorum, konuş..." : "Sorunu yaz veya mikrofonla söyle"}
+            className="min-h-11 w-full resize-none rounded-xl border border-line bg-cream px-3 py-3 text-sm text-ink outline-none focus:border-pine"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={yaziyor || !taslak.trim()}
+          className="inline-flex min-h-11 items-center rounded-xl bg-pine px-4 text-sm font-medium text-cream disabled:opacity-40"
+        >
+          Gönder
+        </button>
+      </form>
     </div>
+  );
+}
+
+function Metin({ metin }: { metin: string }) {
+  const satirlar = metin
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return (
+    <div className="space-y-1">
+      {satirlar.map((satir, i) => (
+        <p key={`${i}-${satir}`}>{parcala(satir)}</p>
+      ))}
+    </div>
+  );
+}
+
+function parcala(satir: string) {
+  const parcalar = satir.split(/(\*\*[^*]+\*\*)/g);
+  return parcalar.map((p, i) =>
+    p.startsWith("**") && p.endsWith("**") ? (
+      <strong key={i} className="font-medium">
+        {p.slice(2, -2)}
+      </strong>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
   );
 }
