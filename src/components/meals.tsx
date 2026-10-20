@@ -4,30 +4,36 @@ import { useOgun } from "@/lib/ogun";
 import { fmtKcal, profildenHesap } from "@/lib/engine";
 import { PageTitle, Panel, Btn } from "@/components/ui";
 import { bugunAnahtar, yemekHesapla } from "@/lib/yemek";
+import { useI18n } from "@/lib/i18n";
 import type { Section } from "./shell";
 
-function hataMesaji(kod: string) {
+function hataMesaji(kod: string, dil: "tr" | "en") {
+  if (dil === "en") {
+    if (kod === "ayiklanamadi") return "Could not recognize food. Try specifying portion, e.g., 2 eggs.";
+    if (kod === "yok") return "API key missing. Use quick foods or manual input.";
+    if (kod === "ag") return "Network error. Check connection and retry.";
+    return "Failed to calculate calories. Please try again.";
+  }
   if (kod === "ayiklanamadi")
     return "Bunu bir yiyecek olarak anlayamadım. Miktarıyla yaz, örneğin: 2 dilim salam.";
   if (kod === "yok") return "API anahtarı bulunamadı. Hızlı besinleri veya manuel girişi kullanabilirsin.";
   if (kod === "ag") return "Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.";
-  if (kod.startsWith("http-")) return `Servis hata verdi (${kod.slice(5)}). Biraz sonra tekrar dene.`;
   return "Kalori hesaplanamadı. Bir kez daha dene.";
 }
 
-// Sık tüketilen temel sporcu besinleri
 const HIZLI_BESINLER = [
-  { ad: "Tavuk Göğsü (150g)", kcal: 248, icon: "🍗" },
-  { ad: "Basmati Pirinç (200g)", kcal: 260, icon: "🍚" },
-  { ad: "Haşlanmış Yumurta (2 Adet)", kcal: 155, icon: "🥚" },
-  { ad: "Yulaf Ezmesi (60g)", kcal: 220, icon: "🥣" },
-  { ad: "Karabuğday / Greçka (180g)", kcal: 210, icon: "🌾" },
-  { ad: "Ton Balığı (1 Kutu)", kcal: 190, icon: "🐟" },
-  { ad: "Muz (1 Adet)", kcal: 105, icon: "🍌" },
-  { ad: "Süzme Yoğurt (200g)", kcal: 130, icon: "🥛" },
+  { ad_tr: "Tavuk Göğsü (150g)", ad_en: "Chicken Breast (150g)", kcal: 248, icon: "🍗" },
+  { ad_tr: "Basmati Pirinç (200g)", ad_en: "Basmati Rice (200g)", kcal: 260, icon: "🍚" },
+  { ad_tr: "Haşlanmış Yumurta (2 Adet)", ad_en: "Boiled Eggs (2 pcs)", kcal: 155, icon: "🥚" },
+  { ad_tr: "Yulaf Ezmesi (60g)", ad_en: "Oatmeal (60g)", kcal: 220, icon: "🥣" },
+  { ad_tr: "Karabuğday / Greçka (180g)", ad_en: "Buckwheat (180g)", kcal: 210, icon: "🌾" },
+  { ad_tr: "Ton Balığı (1 Kutu)", ad_en: "Canned Tuna (1 Can)", kcal: 190, icon: "🐟" },
+  { ad_tr: "Muz (1 Adet)", ad_en: "Banana (1 pc)", kcal: 105, icon: "🍌" },
+  { ad_tr: "Süzme Yoğurt (200g)", ad_en: "Greek Yogurt (200g)", kcal: 130, icon: "🥛" },
 ];
 
 export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
+  const { dil, t } = useI18n();
   const profil = useFit((s) => s.profil);
   const tumOgunler = useOgun((s) => s.ogunler);
   const ekleOgunler = useOgun((s) => s.ekleOgunler);
@@ -47,7 +53,6 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
   const toplam = ogunler.reduce((acc, o) => acc + o.kalori, 0);
   const kalan = gunlukHedef - toplam;
 
-  // Akıllı/AI Arama ile Ekleme
   async function handleEkle(e: FormEvent) {
     e.preventDefault();
     const girdi = metin.trim();
@@ -58,135 +63,135 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
     try {
       const sonuc = await yemekHesapla({ data: { metin: girdi } });
       if (!sonuc.ok) {
-        setHata(hataMesaji(sonuc.hata));
+        setHata(hataMesaji(sonuc.hata, dil));
         return;
       }
       ekleOgunler(
         sonuc.ogeler.map((o) => ({ tarih: bugunAnahtar(), isim: o.ad, kalori: o.kcal }))
       );
       setMetin("");
-      setBilgi("Öğün başarıyla eklendi.");
+      setBilgi(dil === "en" ? "Meal logged successfully." : "Öğün başarıyla eklendi.");
     } catch {
-      setHata("Bir sorun oluştu. Manuel eklemeyi deneyebilirsin.");
+      setHata(dil === "en" ? "An error occurred. Try manual entry." : "Bir sorun oluştu. Manuel eklemeyi deneyebilirsin.");
     } finally {
       setYukleniyor(false);
     }
   }
 
-  // Hazır Butonla Tek Tıkla Ekleme
   function hizliEkle(ad: string, kcal: number) {
     setHata("");
     ekleOgunler([{ tarih: bugun, isim: ad, kalori: kcal }]);
-    setBilgi(`${ad} eklendi (+${kcal} kcal).`);
+    setBilgi(`${ad} +${kcal} kcal.`);
   }
 
-  // Manuel İsim + Kalori Ekleme
   function handleManuelEkle(e: FormEvent) {
     e.preventDefault();
     const ad = manuelAd.trim();
     const kcal = parseInt(manuelKcal, 10);
     if (!ad || isNaN(kcal) || kcal <= 0) {
-      setHata("Lütfen geçerli bir öğün adı ve pozitif kalori değeri gir.");
+      setHata(dil === "en" ? "Enter a valid meal name and calorie value." : "Lütfen geçerli bir öğün adı ve kalori değeri gir.");
       return;
     }
     setHata("");
     ekleOgunler([{ tarih: bugun, isim: ad, kalori: kcal }]);
     setManuelAd("");
     setManuelKcal("");
-    setBilgi(`${ad} günlüğe eklendi (+${kcal} kcal).`);
+    setBilgi(`${ad} +${kcal} kcal.`);
   }
 
   return (
     <div className="space-y-6">
       <PageTitle
         index="04"
-        title="Beslenme & Öğün Takibi"
-        lede="Günlük kalori bütçeni kontrol et, pratik butonlarla veya serbestçe öğünlerini kaydet."
+        title={t.meals.title}
+        lede={t.meals.desc}
       />
+
       {/* Günlük Kalori Durum Özeti */}
       <div className="grid grid-cols-3 gap-3 rounded-2xl border border-line bg-cream p-4 text-center">
         <div>
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">Hedef Bütçe</div>
+          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">{t.meals.targetBudget}</div>
           <div className="mt-1 font-display text-xl font-bold text-ink">{fmtKcal(gunlukHedef)} <span className="text-xs font-normal">kcal</span></div>
         </div>
         <div className="border-x border-line/60">
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">Alınan</div>
+          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">{t.meals.consumed}</div>
           <div className="mt-1 font-display text-xl font-bold text-pine">{fmtKcal(toplam)} <span className="text-xs font-normal">kcal</span></div>
         </div>
         <div>
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">Kalan</div>
+          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">{t.meals.remaining}</div>
           <div className={`mt-1 font-display text-xl font-bold ${kalan < 0 ? "text-clay" : "text-ink"}`}>
             {fmtKcal(kalan)} <span className="text-xs font-normal">kcal</span>
           </div>
         </div>
       </div>
 
-      {/* 1. Sık Tüketilenler (Tek Tıkla Hızlı Ekle) */}
+      {/* Sık Tüketilenler */}
       <Panel>
         <div className="p-5">
           <div className="flex items-center justify-between pb-3 border-b border-line/60">
             <span className="text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-2">
-              <span>⚡</span> Sık Tüketilen Besinler (Hızlı Ekle)
+              <span>⚡</span> {t.meals.quickAdd}
             </span>
-            <span className="text-[11px] text-muted">Tek dokunuş</span>
+            <span className="text-[11px] text-muted">{t.meals.oneTouch}</span>
           </div>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {HIZLI_BESINLER.map((b) => (
-              <button
-                key={b.ad}
-                type="button"
-                onClick={() => hizliEkle(b.ad, b.kcal)}
-                className="flex flex-col items-start rounded-xl border border-line bg-paper/60 p-3 text-left transition hover:border-pine hover:bg-cream active:scale-95"
-              >
-                <span className="text-lg">{b.icon}</span>
-                <span className="mt-1.5 text-xs font-semibold text-ink line-clamp-1">{b.ad}</span>
-                <span className="mt-0.5 text-[11px] font-mono font-bold text-pine">+{b.kcal} kcal</span>
-              </button>
-            ))}
+            {HIZLI_BESINLER.map((b) => {
+              const besinAdi = dil === "en" ? b.ad_en : b.ad_tr;
+              return (
+                <button
+                  key={b.ad_tr}
+                  type="button"
+                  onClick={() => hizliEkle(besinAdi, b.kcal)}
+                  className="flex flex-col items-start rounded-xl border border-line bg-paper/60 p-3 text-left transition hover:border-pine hover:bg-cream active:scale-95"
+                >
+                  <span className="text-lg">{b.icon}</span>
+                  <span className="mt-1.5 text-xs font-semibold text-ink line-clamp-1">{besinAdi}</span>
+                  <span className="mt-0.5 text-[11px] font-mono font-bold text-pine">+{b.kcal} kcal</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </Panel>
 
-      {/* 2. Serbest / AI Öğün Arama ve Manuel Giriş */}
+      {/* Arama & Manuel */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Metinle Arama */}
         <Panel>
           <form onSubmit={handleEkle} className="p-5 flex flex-col justify-between h-full">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-1">
-                Akıllı Öğün Girişi
+                {t.meals.aiInputTitle}
               </label>
-              <p className="text-xs text-muted mb-3">Miktar ve yiyecek yaz (örn: 2 dilim tam buğday ekmeği):</p>
+              <p className="text-xs text-muted mb-3">{t.meals.aiInputDesc}</p>
               <input
                 type="text"
                 value={metin}
                 onChange={(e) => setMetin(e.target.value)}
-                placeholder="Örn: 1 kase mercimek çorbası"
+                placeholder={t.meals.aiInputPlaceholder}
                 className="w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-xs text-ink outline-none focus:border-pine"
               />
             </div>
             <div className="mt-4">
               <Btn type="submit" disabled={yukleniyor}>
-                {yukleniyor ? "Hesaplanıyor..." : "Hesapla ve Ekle"}
+                {yukleniyor ? t.meals.calculating : t.meals.calcAndAdd}
               </Btn>
             </div>
           </form>
         </Panel>
 
-        {/* Manuel Kalori Girişi */}
         <Panel>
           <form onSubmit={handleManuelEkle} className="p-5 flex flex-col justify-between h-full">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-1">
-                Hızlı Manuel Giriş
+                {t.meals.manualTitle}
               </label>
-              <p className="text-xs text-muted mb-3">Paket üzerindeki kaloriye göre hızlı ekle:</p>
+              <p className="text-xs text-muted mb-3">{t.meals.manualDesc}</p>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={manuelAd}
                   onChange={(e) => setManuelAd(e.target.value)}
-                  placeholder="Yemek adı"
+                  placeholder={t.meals.mealName}
                   className="w-2/3 rounded-xl border border-line bg-cream px-3 py-2.5 text-xs text-ink outline-none focus:border-pine"
                 />
                 <input
@@ -203,27 +208,25 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
                 type="submit"
                 className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-xs font-bold text-ink hover:border-pine transition active:scale-95"
               >
-                + Manuel Ekle
+                {t.meals.manualAddBtn}
               </button>
             </div>
           </form>
         </Panel>
       </div>
 
-      {/* Bildirimler */}
       {bilgi && <div className="rounded-xl border border-pine/30 bg-pine/10 p-3 text-xs text-pine">{bilgi}</div>}
       {hata && <div className="rounded-xl border border-clay/30 bg-clay/10 p-3 text-xs text-clay">{hata}</div>}
 
-      {/* Bugün Eklenen Öğünler Listesi */}
       <Panel>
         <div className="p-5">
           <div className="flex items-center justify-between pb-3 border-b border-line/60">
-            <span className="text-xs font-bold uppercase tracking-wider text-ink">Bugün Tüketilenler</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-ink">{t.meals.todayMeals}</span>
             <span className="text-xs font-mono font-bold text-pine">{toplam} kcal</span>
           </div>
 
           {ogunler.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted">Bugün henüz bir öğün girmedin. Yukarıdaki butonlardan hızlıca ekleyebilirsin.</p>
+            <p className="py-6 text-center text-xs text-muted">{t.meals.noMeals}</p>
           ) : (
             <ul className="mt-3 divide-y divide-line/40">
               {ogunler.map((o) => (
@@ -235,7 +238,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
                       type="button"
                       onClick={() => silOgun(o.id)}
                       className="text-muted hover:text-clay transition"
-                      title="Sil"
+                      title="Delete"
                     >
                       ✕
                     </button>

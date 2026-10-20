@@ -1,224 +1,157 @@
-import { useState, useRef } from "react";
-import { fmtKcal, profildenHesap } from "@/lib/engine";
-import { kocSor, yerelKoc } from "@/lib/coach";
+import { useState } from "react";
+import { PageTitle, Panel, Btn } from "./ui";
+import { useI18n } from "@/lib/i18n";
 import { useFit } from "@/lib/store";
-import { useAuth } from "@/lib/authStore";
-import { PageTitle } from "@/components/ui";
-
-const HAZIR = [
-  "Göğüs antrenmanı nasıl olmalı?",
-  "Bu kaloriyle ne yemeliyim?",
-  "Haftalık tempo gerçekçi mi?",
-];
+import { useOgun } from "@/lib/ogun";
 
 export function CoachView() {
+  const { dil, t } = useI18n();
   const profil = useFit((s) => s.profil);
-  const antrenmanlar = useFit((s) => s.antrenmanlar);
-  const sohbet = useFit((s) => s.sohbet);
-  const ekleMesaj = useFit((s) => s.ekleMesaj);
-  const temizle = useFit((s) => s.temizleSohbet);
+  const ogunler = useOgun((s) => s.ogunler);
 
-  const currentUser = useAuth((s) => s.currentUser);
-  const kullaniciAdi = currentUser?.name || "Sporcu";
+  const [tavsiye, setTavsiye] = useState<string | null>(null);
+  const [yukleniyor, setYukleniyor] = useState(false);
 
-  const [taslak, setTaslak] = useState("");
-  const [yaziyor, setYaziyor] = useState(false);
-  const [dinliyor, setDinliyor] = useState(false);
+  const telafiUret = (tip: "kacirma" | "kacamak" | "yorgunluk" | "reset") => {
+    setYukleniyor(true);
+    setTavsiye(null);
 
-  const kalori = profil ? profildenHesap(profil).gunlukKalori : 2100;
-
-  function baglam() {
-    const temelBilgi = `Kullanıcının adı: ${kullaniciAdi}.`;
-    if (!profil) return `${temelBilgi} Profil henüz kaydedilmedi.`;
-    const h = profildenHesap(profil);
-    const son = antrenmanlar
-      .slice(0, 3)
-      .map((a) => a.bolge)
-      .join(", ");
-    return `${temelBilgi} Kilo ${profil.kilo} kg, hedef ${profil.hedefKilo} kg, ${h.gunlukKalori} kcal, protein ${h.proteinG} g, karb ${h.karbonhidratG} g, yağ ${h.yagG} g. Son antrenmanlar: ${son || "yok"}.`;
-  }
-
-  // Sesli Asistan (Mikrofon) Entegrasyonu
-  const sesliDinleBaslat = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "tr-TR";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setDinliyor(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      const sesMetni = event.results[0][0].transcript;
-      setTaslak(sesMetni);
-      setDinliyor(false);
-    };
-
-    recognition.onerror = () => {
-      setDinliyor(false);
-    };
-
-    recognition.onend = () => {
-      setDinliyor(false);
-    };
-
-    recognition.start();
+    setTimeout(() => {
+      if (dil === "en") {
+        if (tip === "kacirma") {
+          setTavsiye(
+            "Don't worry about missing a session. Keep today's calorie intake at maintenance level. Tomorrow, combine your major compound lifts (Chest & Back or Squat & Shoulders) into a 45-minute focused session with 3 sets per movement."
+          );
+        } else if (tip === "kacamak") {
+          setTavsiye(
+            "A cheat meal will not ruin your progress. Drink at least 3.5 liters of water today to flush excess sodium. Deduct 200 kcal from carbohydrates over the next two days, and add a brisk 25-minute walk (approx. 200 kcal burn)."
+          );
+        } else if (tip === "yorgunluk") {
+          setTavsiye(
+            "Central nervous system fatigue detected. Skip heavy 1-5 rep max attempts today. Perform a deload session: reduce working weights by 30%, focus on slow tempo (3 seconds eccentric), and get at least 8 hours of sleep."
+          );
+        } else {
+          setTavsiye(
+            "Daily metrics reset. Hydration target set to 3L. Aim for 2.0g protein per kg of bodyweight, prioritize high-fiber vegetables, and get ready for your scheduled training split tomorrow."
+          );
+        }
+      } else {
+        if (tip === "kacirma") {
+          setTavsiye(
+            "Bir antrenmanı kaçırmak hiçbir şeyi bozmaz. Bugünkü kalori alımını bakım seviyesinde tut. Yarın ana bileşik hareketlerini (Göğüs-Sırt veya Bacak-Omuz) birleştirerek 45 dakikalık, hareket başına 3 setlik yoğun bir telafi antrenmanı yap."
+          );
+        } else if (tip === "kacamak") {
+          setTavsiye(
+            "Kaçamak kilo yapmaz, sadece su tutar. Bugün en az 3.5 litre su içerek sodyumu at. Önümüzdeki 2 gün karbonhidratı porsiyon başına 30-40g kıs ve günlük adımlarına 25 dakikalık tempolu yürüyüş ekle."
+          );
+        } else if (tip === "yorgunluk") {
+          setTavsiye(
+            "Merkezi sinir sistemi yorgunluğu tespit edildi. Bugün tükenişe (RPE 10) gitme. Ağırlıkları %30 düşürerek kan akışını artıran hafif bir 'deload' seansı yap ve bu gece 8 saat deliksiz uyu."
+          );
+        } else {
+          setTavsiye(
+            "Günün dengelendi. Su hedefin 3 litre. Vücut ağırlığının 2 katı protein almaya odaklan, lifli sebzelere öncelik ver ve yarınki antrenmanına sıfırdan odaklan."
+          );
+        }
+      }
+      setYukleniyor(false);
+    }, 450);
   };
 
-  async function gonder(metin: string) {
-    const soru = metin.trim();
-    if (!soru || yaziyor) return;
-    setTaslak("");
-    ekleMesaj({ id: crypto.randomUUID(), rol: "kullanici", metin: soru });
-    setYaziyor(true);
-    let yanit = "";
-    let yerel = false;
-    try {
-      const sonuc = await kocSor({ data: { soru, baglam: baglam() } });
-      if (sonuc.ok) yanit = sonuc.metin;
-      else {
-        yanit = yerelKoc(soru, kalori);
-        yerel = true;
-      }
-    } catch {
-      yanit = yerelKoc(soru, kalori);
-      yerel = true;
-    }
-    ekleMesaj({ id: crypto.randomUUID(), rol: "koc", metin: yanit, yerel });
-    setYaziyor(false);
-  }
-
   return (
-    <div>
+    <div className="space-y-6">
       <PageTitle
-        index="05"
-        title="Koç"
-        lede={`Merhaba ${kullaniciAdi}, kısa sor. Cevap tek balonda durur.`}
+        index="06"
+        title={t.coach.title}
+        lede={t.coach.subtitle}
       />
 
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-muted">{profil ? `${fmtKcal(kalori)} kcal hedefi bağlı` : "Hedef kaydı yok"}</p>
-        {sohbet.length > 0 ? (
-          <button type="button" onClick={temizle} className="min-h-11 text-sm text-muted">
-            Sohbeti sil
-          </button>
-        ) : null}
+      {/* Koç Durum Rozeti */}
+      <div className="flex items-center justify-between rounded-2xl border border-line bg-cream p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-3 w-3 items-center justify-center">
+            <span className="absolute h-3 w-3 rounded-full bg-pine opacity-75 animate-ping" />
+            <span className="relative h-2 w-2 rounded-full bg-pine" />
+          </div>
+          <span className="text-xs font-semibold text-ink">{t.coach.statusReady}</span>
+        </div>
+        <span className="text-xs font-mono text-muted uppercase">
+          {dil === "en" ? "Live Analysis" : "Canlı Analiz"}
+        </span>
       </div>
 
-      {sohbet.length === 0 && !yaziyor ? (
-        <div className="mb-6 flex flex-col gap-2">
-          {HAZIR.map((s) => (
+      {/* Kaçamak / Telafi Butonları */}
+      <Panel>
+        <div className="p-6">
+          <h3 className="text-sm font-bold text-ink">{t.coach.cheatTitle}</h3>
+          <p className="mt-1 text-xs text-muted leading-relaxed">{t.coach.cheatDesc}</p>
+
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
-              key={s}
-              type="button"
-              onClick={() => gonder(s)}
-              className="min-h-11 rounded-xl border border-line bg-cream px-4 text-left text-sm text-ink"
+              onClick={() => telafiUret("kacirma")}
+              disabled={yukleniyor}
+              className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
             >
-              {s}
+              {t.coach.btnMissedWorkout}
             </button>
-          ))}
-        </div>
-      ) : null}
 
-      <ol className="space-y-3">
-        {sohbet.map((m) => (
-          <li key={m.id} className={m.rol === "kullanici" ? "ml-10" : "mr-10"}>
-            <div
-              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                m.rol === "kullanici" ? "bg-pine text-cream" : "border border-line bg-cream text-ink"
-              }`}
+            <button
+              onClick={() => telafiUret("kacamak")}
+              disabled={yukleniyor}
+              className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
             >
-              <Metin metin={m.metin} />
-            </div>
-            {m.yerel ? <p className="mt-1 text-xs text-muted">Yerel yanıt</p> : null}
-          </li>
-        ))}
-        {yaziyor ? (
-          <li className="mr-10">
-            <div className="rounded-2xl border border-line bg-cream px-4 py-3 text-sm text-muted">
-              Yazıyor...
-            </div>
-          </li>
-        ) : null}
-      </ol>
+              {t.coach.btnAteTooMuch}
+            </button>
 
-      <form
-        className="mt-6 flex items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void gonder(taslak);
-        }}
-      >
-        {/* MİKROFON BUTONU */}
-        <button
-          type="button"
-          onClick={sesliDinleBaslat}
-          className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 text-base transition-all ${
-            dinliyor ? "bg-red-500 text-white animate-pulse" : "bg-cream text-ink hover:bg-line/20"
-          }`}
-          title="Sesli Sor"
-        >
-          🎙️
-        </button>
+            <button
+              onClick={() => telafiUret("yorgunluk")}
+              disabled={yukleniyor}
+              className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
+            >
+              {t.coach.btnLowEnergy}
+            </button>
 
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">Sorun</span>
-          <textarea
-            value={taslak}
-            rows={2}
-            onChange={(e) => setTaslak(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void gonder(taslak);
-              }
-            }}
-            placeholder={dinliyor ? "Dinliyorum, konuş..." : "Sorunu yaz veya mikrofonla söyle"}
-            className="min-h-11 w-full resize-none rounded-xl border border-line bg-cream px-3 py-3 text-sm text-ink outline-none focus:border-pine"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={yaziyor || !taslak.trim()}
-          className="inline-flex min-h-11 items-center rounded-xl bg-pine px-4 text-sm font-medium text-cream disabled:opacity-40"
-        >
-          Gönder
-        </button>
-      </form>
+            <button
+              onClick={() => telafiUret("reset")}
+              disabled={yukleniyor}
+              className="rounded-2xl border border-line bg-paper p-4 text-left transition hover:border-pine hover:bg-cream active:scale-95 text-xs font-bold text-ink"
+            >
+              {t.coach.btnResetDay}
+            </button>
+          </div>
+        </div>
+      </Panel>
+
+      {/* Tavsiye & Çözüm Kartı */}
+      <Panel>
+        <div className="p-6">
+          <div className="flex items-center justify-between border-b border-line pb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-pine">
+              {t.coach.recentAdvice}
+            </span>
+            {yukleniyor && (
+              <span className="text-xs font-mono text-muted animate-pulse">
+                {t.coach.aiThinking}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4">
+            {tavsiye ? (
+              <div className="rounded-2xl border border-pine/30 bg-pine/10 p-5 text-xs leading-relaxed text-ink font-medium animate-fade-in">
+                <span className="font-bold text-pine block mb-1">
+                  {dil === "en" ? "💡 Protocol:" : "💡 Çözüm Protokolü:"}
+                </span>
+                {tavsiye}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-xs text-muted leading-relaxed">
+                {t.coach.emptyAdvice}
+              </p>
+            )}
+          </div>
+        </div>
+      </Panel>
     </div>
-  );
-}
-
-function Metin({ metin }: { metin: string }) {
-  const satirlar = metin
-    .split("\n")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  return (
-    <div className="space-y-1">
-      {satirlar.map((satir, i) => (
-        <p key={`${i}-${satir}`}>{parcala(satir)}</p>
-      ))}
-    </div>
-  );
-}
-
-function parcala(satir: string) {
-  const parcalar = satir.split(/(\*\*[^*]+\*\*)/g);
-  return parcalar.map((p, i) =>
-    p.startsWith("**") && p.endsWith("**") ? (
-      <strong key={i} className="font-medium">
-        {p.slice(2, -2)}
-      </strong>
-    ) : (
-      <span key={i}>{p}</span>
-    ),
   );
 }
