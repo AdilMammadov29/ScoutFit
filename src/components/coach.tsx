@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { PageTitle, Panel, Btn } from "./ui";
 import { useFit } from "@/lib/store";
 import { profildenHesap } from "@/lib/engine";
+import { kocSor, yerelKoc } from "@/lib/coach";
 
 interface Mesaj {
   id: string;
@@ -12,70 +13,76 @@ interface Mesaj {
 export function CoachView() {
   const profil = useFit((s) => s.profil);
   const h = profil ? profildenHesap(profil) : null;
+  const gunlukKalori = h ? h.gunlukKalori : 2500;
 
   const [mesajlar, setMesajlar] = useState<Mesaj[]>([
     {
       id: "1",
       gonderen: "koc",
-      metin: "Selam! Ben ScoutFit Koçun. Antrenmanların, beslenmen, kaçamakların veya yorgunluk durumun hakkında bana dilediğini sorabilirsin.",
+      metin: "Selam! Ben ScoutFit Koçun. Antrenman programın, beslenmen, kaçamakların veya form durumun hakkında bana dilediğini sorabilirsin.",
     },
   ]);
   const [girdi, setGirdi] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
-  // Gelen soruya göre yanıt üreten mantık
-  const cevapUret = (soru: string): string => {
-    const s = soru.toLowerCase();
-
-    if (s.includes("pizza") || s.includes("hamburger") || s.includes("tatlı") || s.includes("kaçamak") || s.includes("fazla yedim")) {
-      return "Kaçamak yaptığın için moralini bozma, tek bir öğünle form kaybolmaz. Bugün bol su iç (en az 3-3.5L) ve sodyumu dengele. Yarın ve sonraki gün karbonhidratı biraz kısıp 20-30 dakika tempolu yürüyüş eklersen tamamen dengelenir.";
-    }
-
-    if (s.includes("antrenman") && (s.includes("kaçtı") || s.includes("gidemedim") || s.includes("yapamadım"))) {
-      return "Sorun değil. Dinlenme günü gibi düşün. Bugün kalorilerini aşmamaya çalış. Bir sonraki gün ana hareketleri birleştirerek (örneğin Göğüs + Sırt veya Bacak + Omuz) 45 dakikalık bileşik bir telafi seansı çıkarabilirsin.";
-    }
-
-    if (s.includes("yorgun") || s.includes("ağrı") || s.includes("uyku") || s.includes("enerjim yok")) {
-      return "Merkezi sinir sistemin sinyal veriyor olabilir. Bugün ağır kilolara girmek yerine ağırlıkları %30 düşür, esnemeye odaklan veya direkt dinlen. En az 8 saat uyku ve iyi beslenme toparlanmanı hızlandıracaktır.";
-    }
-
-    if (s.includes("kilo") || s.includes("hedef") || s.includes("kalori")) {
-      const hedefKcal = h ? h.gunlukKalori : 2400;
-      return `Mevcut verilerine göre günlük kalori hedefin yaklaşık ${hedefKcal} kcal. Haftalık kilo takibinde ani iniş çıkışlara takılma; su dengesi, tuz ve sindirim kilo değişimlerini dalgalandırabilir. Haftalık ortalamaya odaklan.`;
-    }
-
-    if (s.includes("protein") || s.includes("tavuk") || s.includes("beslenme")) {
-      return "Kas kütlesini korumak ve geliştirmek için kilo başına 1.6 - 2.2 gram protein hedeflemek idealdir. Öğünlerini gün içine dengeli dağıtıp tavuk, yumurta, lor veya balık gibi temiz kaynaklara öncelik ver.";
-    }
-
-    return "Sorunu aldım. Hedefine sadık kalmak için tutarlılık en kritik faktördür. Beslenmende günlük kalori sınırını koru, antrenmanlarında ise tükenişe 1-2 tekrar kala (RPE 8-9) kontrollü çalışmaya devam et. Başka bir detay varsa sorabilirsin.";
+  // Kullanıcı profiline göre yapay zekaya bağlam metni hazırlar
+  const baglamOlustur = () => {
+    if (!profil || !h) return "Kilo: 75kg, Hedef: Kas kazanımı ve fit kalma";
+    return `Mevcut kilo: ${profil.kilo}kg, Hedef kilo: ${profil.hedefKilo}kg, Boy: ${profil.boy}cm, Günlük kalori bütçesi: ${h.gunlukKalori} kcal`;
   };
 
-  const handleGonder = (e: FormEvent) => {
+  const handleGonder = async (e: FormEvent) => {
     e.preventDefault();
-    const metin = girdi.trim();
-    if (!metin || yukleniyor) return;
+    const soruMetni = girdi.trim();
+    if (!soruMetni || yukleniyor) return;
 
     const yeniKullaniciMesaji: Mesaj = {
       id: Date.now().toString(),
       gonderen: "kullanici",
-      metin,
+      metin: soruMetni,
     };
 
-    setMesajlar((onceki) => [...onceki, yeniKullaniciMesaji]);
+    setMesajlar((prev) => [...prev, yeniKullaniciMesaji]);
     setGirdi("");
     setYukleniyor(true);
 
-    setTimeout(() => {
-      const yanit = cevapUret(metin);
-      const yeniKocMesaji: Mesaj = {
-        id: (Date.now() + 1).toString(),
-        gonderen: "koc",
-        metin: yanit,
-      };
-      setMesajlar((onceki) => [...onceki, yeniKocMesaji]);
+    try {
+      // 1. Gerçek Yapay Zekaya (Groq API) Sor
+      const sonuc = await kocSor({
+        data: {
+          soru: soruMetni,
+          baglam: baglamOlustur(),
+        },
+      });
+
+      let cevap = "";
+      if (sonuc.ok && sonuc.metin) {
+        cevap = sonuc.metin;
+      } else {
+        // API anahtarı yoksa veya hata verirse yerel akıllı motordan cevap al
+        cevap = yerelKoc(soruMetni, gunlukKalori);
+      }
+
+      setMesajlar((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          gonderen: "koc",
+          metin: cevap,
+        },
+      ]);
+    } catch {
+      setMesajlar((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          gonderen: "koc",
+          metin: yerelKoc(soruMetni, gunlukKalori),
+        },
+      ]);
+    } finally {
       setYukleniyor(false);
-    }, 400);
+    }
   };
 
   return (
@@ -83,7 +90,7 @@ export function CoachView() {
       <PageTitle
         index="06"
         title="ScoutFit AI Koç"
-        lede="Aklına takılan her şeyi yaz, antrenman ve beslenme tavsiyelerini anında al."
+        lede="Aklına takılan her şeyi yaz; antrenman, kaçamak telafisi ve beslenme tavsiyelerini gerçek yapay zeka ile al."
       />
 
       <Panel>
@@ -98,7 +105,7 @@ export function CoachView() {
                   className={`flex ${kullaniciMi ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed ${
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap ${
                       kullaniciMi
                         ? "bg-pine text-cream font-medium"
                         : "border border-line bg-cream text-ink"
@@ -116,13 +123,13 @@ export function CoachView() {
             {yukleniyor && (
               <div className="flex justify-start">
                 <div className="rounded-2xl border border-line bg-cream px-4 py-3 text-xs text-muted animate-pulse">
-                  Koç düşünüyor...
+                  Koç düşünüyor ve hazırlıyor...
                 </div>
               </div>
             )}
           </div>
 
-          {/* Soru Yazma Kutusu */}
+          {/* Soru Yazma Alanı */}
           <form
             onSubmit={handleGonder}
             className="border-t border-line p-3 flex gap-2 bg-paper"
@@ -131,7 +138,7 @@ export function CoachView() {
               type="text"
               value={girdi}
               onChange={(e) => setGirdi(e.target.value)}
-              placeholder="Koça bir şey sor (örn: Dün akşam tatlı yedim ne yapayım?)"
+              placeholder="Koça sor (örn: Dün gece 1 büyük pizza yedim, bugünü nasıl telafi edeyim?)"
               className="flex-1 rounded-xl border border-line bg-cream px-4 py-2.5 text-xs text-ink outline-none focus:border-pine"
             />
             <Btn type="submit" disabled={yukleniyor || !girdi.trim()}>
