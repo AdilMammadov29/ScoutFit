@@ -17,13 +17,54 @@ export interface SozlukYapisi {
   };
   today: {
     title: string;
+    subtitle: string;
     targetCal: string;
     consumed: string;
     remaining: string;
     burned: string;
-    quickAdd: string;
+    deficit: string;
+    surplus: string;
     todaysWorkout: string;
     noWorkout: string;
+    goToTrain: string;
+    goToMeals: string;
+    waterIntake: string;
+    addWater: string;
+    quickStats: string;
+  };
+  goal: {
+    title: string;
+    subtitle: string;
+    currentWeight: string;
+    targetWeight: string;
+    height: string;
+    age: string;
+    activity: string;
+    goalType: string;
+    bulk: string;
+    cut: string;
+    maintain: string;
+    calculate: string;
+    bmr: string;
+    tdee: string;
+    dailyBudget: string;
+    saveGoal: string;
+    saved: string;
+  };
+  train: {
+    title: string;
+    subtitle: string;
+    startWorkout: string;
+    activeWorkout: string;
+    finishWorkout: string;
+    addExercise: string;
+    exerciseName: string;
+    weight: string;
+    reps: string;
+    addSet: string;
+    completed: string;
+    noExercises: string;
+    volume: string;
   };
   meals: {
     title: string;
@@ -59,6 +100,18 @@ export interface SozlukYapisi {
     aiThinking: string;
     emptyAdvice: string;
   };
+  gps: {
+    title: string;
+    subtitle: string;
+    startRun: string;
+    stopRun: string;
+    distance: string;
+    pace: string;
+    duration: string;
+    caloriesBurned: string;
+    gpsWaiting: string;
+    routeTracking: string;
+  };
   common: {
     kcal: string;
     kg: string;
@@ -68,6 +121,7 @@ export interface SozlukYapisi {
     save: string;
     cancel: string;
     close: string;
+    delete: string;
   };
 }
 
@@ -87,13 +141,54 @@ export const SOZLUK: Record<Dil, SozlukYapisi> = {
     },
     today: {
       title: "Günün Özeti",
+      subtitle: "Günlük kalori dengen, makroların ve antrenman takibin.",
       targetCal: "Hedef Bütçe",
       consumed: "Alınan",
       remaining: "Kalan",
       burned: "Yakılan",
-      quickAdd: "Hızlı Ekle",
+      deficit: "Defisit (Açık)",
+      surplus: "Sürplus (Fazla)",
       todaysWorkout: "Bugünkü Antrenman",
-      noWorkout: "Bugün planlanmış antrenman yok.",
+      noWorkout: "Bugün henüz antrenman kaydı yok.",
+      goToTrain: "Antrenmana Git",
+      goToMeals: "Öğün Ekle",
+      waterIntake: "Su Takibi",
+      addWater: "+250 ml Ekle",
+      quickStats: "Günlük Rapor",
+    },
+    goal: {
+      title: "Hedef & Metabolizma",
+      subtitle: "Kilona ve hedefine göre kalori ve makro oranlarını belirle.",
+      currentWeight: "Mevcut Kilo",
+      targetWeight: "Hedef Kilo",
+      height: "Boy",
+      age: "Yaş",
+      activity: "Aktivite Seviyesi",
+      goalType: "Hedef Türü",
+      bulk: "Kas Kazanımı (Lean Bulk)",
+      cut: "Yağ Yakımı (Defisit)",
+      maintain: "Kilo Koruma",
+      calculate: "Hesapla",
+      bmr: "BMR (Bazal Metabolizma)",
+      tdee: "TDEE (Günlük Harcama)",
+      dailyBudget: "Hedef Günlük Kalori",
+      saveGoal: "Hedefi Kaydet",
+      saved: "Hedef başarıyla kaydedildi.",
+    },
+    train: {
+      title: "Antrenman Günlüğü",
+      subtitle: "Setlerini, ağırlıklarını ve tekrar sayılarını kaydet.",
+      startWorkout: "Antrenmanı Başlat",
+      activeWorkout: "Aktif Antrenman",
+      finishWorkout: "Antrenmanı Bitir",
+      addExercise: "+ Hareket Ekle",
+      exerciseName: "Egzersiz Adı",
+      weight: "Ağırlık",
+      reps: "Tekrar",
+      addSet: "+ Set Ekle",
+      completed: "Tamamlandı",
+      noExercises: "Henüz hareket eklenmedi. Başlamak için hareket ekle.",
+      volume: "Toplam Hacim",
     },
     meals: {
       title: "Beslenme & Öğün Takibi",
@@ -129,6 +224,18 @@ export const SOZLUK: Record<Dil, SozlukYapisi> = {
       aiThinking: "Koç senin için en iyi stratejiyi hesaplıyor...",
       emptyAdvice: "Yukarıdaki butonlardan bir durum seç veya durumunu paylaş, telafi stratejisi hemen oluşturulsun.",
     },
+    gps: {
+      title: "GPS & Rota Takibi",
+      subtitle: "Koşu ve yürüyüş rotanı canlı izle, harcanan kaloriyi gör.",
+      startRun: "Koşuyu Başlat",
+      stopRun: "Bitir ve Kaydet",
+      distance: "Mesafe",
+      pace: "Tempo (Pace)",
+      duration: "Süre",
+      caloriesBurned: "Yakılan Kalori",
+      gpsWaiting: "GPS konumu bekleniyor...",
+      routeTracking: "Canlı Rota İzleniyor",
+    },
     common: {
       kcal: "kcal",
       kg: "kg",
@@ -138,6 +245,7 @@ export const SOZLUK: Record<Dil, SozlukYapisi> = {
       save: "Kaydet",
       cancel: "İptal",
       close: "Kapat",
+      delete: "Sil",
     },
   },
   en: {
@@ -155,18 +263,59 @@ export const SOZLUK: Record<Dil, SozlukYapisi> = {
     },
     today: {
       title: "Daily Summary",
-      targetCal: "Target Budget",
+      subtitle: "Your daily energy balance, macros, and workout tracking.",
+      targetCal: "Calorie Budget",
       consumed: "Consumed",
       remaining: "Remaining",
       burned: "Burned",
-      quickAdd: "Quick Add",
+      deficit: "Deficit",
+      surplus: "Surplus",
       todaysWorkout: "Today's Workout",
-      noWorkout: "No workout scheduled for today.",
+      noWorkout: "No workouts logged today yet.",
+      goToTrain: "Go to Training",
+      goToMeals: "Log Meal",
+      waterIntake: "Water Intake",
+      addWater: "+250 ml Add",
+      quickStats: "Daily Stats",
+    },
+    goal: {
+      title: "Goal & Metabolism",
+      subtitle: "Configure calorie and macro ratios tailored to your body.",
+      currentWeight: "Current Weight",
+      targetWeight: "Target Weight",
+      height: "Height",
+      age: "Age",
+      activity: "Activity Level",
+      goalType: "Goal Type",
+      bulk: "Muscle Gain (Lean Bulk)",
+      cut: "Fat Loss (Deficit)",
+      maintain: "Weight Maintenance",
+      calculate: "Calculate",
+      bmr: "BMR (Basal Metabolic Rate)",
+      tdee: "TDEE (Total Daily Energy)",
+      dailyBudget: "Target Daily Calories",
+      saveGoal: "Save Goal",
+      saved: "Goal saved successfully.",
+    },
+    train: {
+      title: "Workout Log",
+      subtitle: "Track sets, weights, and repetitions with precision.",
+      startWorkout: "Start Workout",
+      activeWorkout: "Active Session",
+      finishWorkout: "Finish Workout",
+      addExercise: "+ Add Exercise",
+      exerciseName: "Exercise Name",
+      weight: "Weight",
+      reps: "Reps",
+      addSet: "+ Add Set",
+      completed: "Completed",
+      noExercises: "No exercises added yet. Add an exercise to begin.",
+      volume: "Total Volume",
     },
     meals: {
       title: "Nutrition & Meal Tracker",
       desc: "Track your daily calorie budget, log meals easily with quick shortcuts or manual entry.",
-      targetBudget: "Target Budget",
+      targetBudget: "Calorie Budget",
       consumed: "Consumed",
       remaining: "Remaining",
       quickAdd: "Frequent Foods (Quick Add)",
@@ -197,6 +346,18 @@ export const SOZLUK: Record<Dil, SozlukYapisi> = {
       aiThinking: "Coach is calculating the optimal plan...",
       emptyAdvice: "Select an option above to generate a tailored adjustment and compensation plan.",
     },
+    gps: {
+      title: "GPS & Route Tracking",
+      subtitle: "Track live running routes, pace, and real-time calorie burn.",
+      startRun: "Start Run",
+      stopRun: "Finish & Save",
+      distance: "Distance",
+      pace: "Pace",
+      duration: "Duration",
+      caloriesBurned: "Burned Calories",
+      gpsWaiting: "Waiting for GPS signal...",
+      routeTracking: "Live Route Active",
+    },
     common: {
       kcal: "kcal",
       kg: "kg",
@@ -206,6 +367,7 @@ export const SOZLUK: Record<Dil, SozlukYapisi> = {
       save: "Save",
       cancel: "Cancel",
       close: "Close",
+      delete: "Delete",
     },
   },
 };
