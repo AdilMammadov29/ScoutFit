@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { bulutaBaglan, bulutuDurdur } from "@/lib/sync";
+import { useAuth } from "@/lib/authStore";
 import { AuthView } from "./auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -12,6 +13,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setSession(session);
       if (session?.user) {
         void bulutaBaglan(session.user.id);
+        const emailName = session.user.email?.split("@")[0] || "Kullanıcı";
+        (useAuth as any).setState({ currentUser: emailName });
       }
       setLoading(false);
     });
@@ -20,8 +23,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setSession(session);
       if (session?.user) {
         void bulutaBaglan(session.user.id);
+        const emailName = session.user.email?.split("@")[0] || "Kullanıcı";
+        (useAuth as any).setState({ currentUser: emailName });
       } else {
         bulutuDurdur();
+        (useAuth as any).setState({ currentUser: null });
       }
     });
 
@@ -36,11 +42,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Kullanıcı giriş yapmamışsa şık açık renkli Supabase destekli AuthView gösterilir
   if (!session) {
     return <AuthView />;
   }
 
-  // Giriş yapılmışsa doğrudan ana uygulamaya (dashboard/shell) geçilir
   return <>{children}</>;
 }
