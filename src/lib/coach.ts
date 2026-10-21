@@ -1,9 +1,9 @@
 export function yerelKoc(soru: string, kalori: number): string {
   const q = soru.toLocaleLowerCase("tr-TR");
   if (["naber", "merhaba", "selam", "hey", "nasılsın", "iyi günler"].some((k) => q.includes(k))) {
-    return `Merhaba. Günlük hedefin ${kalori} kcal. Antrenman, öğün ya da tempo — hangisini açalım?`;
+    return `Selam! Günlük hedefin ${kalori} kcal. Bugün neyi planlıyoruz, antrenman mı beslenme mi?`;
   }
-  return `${kalori} kcal hedefini bozmadan sorunu antrenman ya da öğün olarak netleştirirsen daha kısa cevap veririm. Neyi değiştirmek istiyorsun?`;
+  return `${kalori} kcal hedefindeyiz. Konuyu antrenman ya da beslenme olarak netleştirirsen hemen yardımcı olurum.`;
 }
 
 export type ChatMesaji = {
@@ -29,17 +29,19 @@ export async function kocSor({ data }: { data: KocGirdi }) {
     return { ok: false as const, hata: "api_key_eksik" };
   }
 
-  // Sistem talimatı
-  const sistemIcerik = `Sen ScoutFit profesyonel fitness koçusun.
-Kullanıcı Profili: ${baglam || "belirtilmedi"}.
+  const sistemIcerik = `Sen ScoutFit'in kişisel fitness koçusun.
+Kullanıcı Profili ve Bilgileri: ${baglam || "profil bilgisi henüz girilmemiş"}.
 
-KESİN KURALLAR:
-1. Asla her cümlene "Merhaba", "Selam", "Hoş geldin" gibi kalıplarla BAŞLAMA. Sohbet zaten akıyor, doğrudan soruya net ve samimi cevap ver.
-2. Kesinlikle EMOJİ KULLANMA.
-3. Konuşma geçmişini takip et, kullanıcının daha önce söylediği şeyleri (örneğin adını veya durumunu) hatırla.
-4. Yanıtların sade, somut ve Türkçe olsun. Gereksiz dolandırma.`;
+TEMEL KURALLAR VE HİTAP ADAPTASYONU:
+1. Aynalama ve Hitap (En Önemli): Kullanıcının tarzına, enerjisine ve isteklerine %100 uyum sağla.
+   - Kullanıcı sana "kanka / bro / reis / hocam" gibi samimi yaklaşıyorsa aynı samimiyetle cevap ver.
+   - Kullanıcı resmi veya ciddi konuşuyorsa net, profesyonel bir koç gibi konuş.
+   - Kullanıcı sana "Bana X diye hitap et" derse (örneğin "Bana patron de", "Bana adımla seslen"), bu hitabı anında benimse ve devam ettir.
+2. Açılış Kalıpları: Her mesaja otomatik olarak "Merhaba", "Selam" diyerek başlama; konuşma akışına göre doğrudan konuya gir.
+3. Hafıza: Profildeki veya sohbet geçmişindeki bilgileri (adı, kilosu, hedefleri) takip et. Adını veya durumunu sorduğunda doğru hatırla.
+4. Netlik: Uzun, sıkıcı teorik nutuklar atma. Sade, uygulanabilir ve pratik adımlar sun.
+5. Aşırı emoji kullanma; duruma göre en fazla 1 tane samimi emoji tercih edebilirsin.`;
 
-  // Sohbet geçmişini hazırla (varsa geçmişi ekle, yoksa sadece son soruyu koy)
   const gonderilecekMesajlar: ChatMesaji[] = [
     { role: "system", content: sistemIcerik },
     ...(data.gecmis || []),
@@ -56,7 +58,7 @@ KESİN KURALLAR:
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
-        temperature: 0.5,
+        temperature: 0.6,
         max_tokens: 700,
         messages: gonderilecekMesajlar,
       }),
