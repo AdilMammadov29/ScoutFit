@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useFit } from "@/lib/store";
+import { useSettingsStore } from "@/lib/settingsStore";
+import { triggerHaptic, speakFeedback } from "@/lib/feedback";
 
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
@@ -41,6 +43,7 @@ function mesafeHesapla(lat1: number, lon1: number, lat2: number, lon2: number) {
 
 export function GpsTracker() {
   const ekleAntrenman = useFit((s: any) => s.ekleAntrenman);
+  const settings = useSettingsStore((s) => s.settings);
 
   const [aktif, setAktif] = useState(false);
   const [sure, setSure] = useState(0);
@@ -48,6 +51,8 @@ export function GpsTracker() {
   const [hiz, setHiz] = useState(0);
   const [rota, setRota] = useState<Array<[number, number]>>([]);
   const [simdikiKonum, setSimdikiKonum] = useState<[number, number]>([37.7648, 30.5566]);
+
+  const sonKilometreRef = useRef<number>(0);
 
   // Sayfa yenilendiğinde verilerin silinmemesi için localStorage başlangıcı
   const [aktiviteler, setAktiviteler] = useState<any[]>(() => {
@@ -96,13 +101,17 @@ export function GpsTracker() {
   const antrenmaniBaslat = () => {
     setHata(null);
     if (!navigator.geolocation) {
-      return setHata("Tarayıcınız GPS konum servisini desteklemiyor.");
+      return setHata("Cihazınız veya tarayıcınız GPS servisini desteklemiyor.");
     }
+
+    triggerHaptic("start");
+    speakFeedback("Antrenman başladı.");
 
     setAktif(true);
     setSure(0);
     setMesafe(0);
     setRota([]);
+    sonKilometreRef.current = 0;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -117,7 +126,19 @@ export function GpsTracker() {
             const [sonLat, sonLng] = onceki[onceki.length - 1];
             const ekMesafe = mesafeHesapla(sonLat, sonLng, latitude, longitude);
             if (ekMesafe < 0.5) {
-              setMesafe((m) => Number((m + ekMesafe).toFixed(3)));
+              setMesafe((m) => {
+                const yeniMesafe = Number((m + ekMesafe).toFixed(3));
+                
+                // Her tam kilometrede bir ses ve titreşim uyarısı
+                const suAnkiKm = Math.floor(yeniMesafe);
+                if (suAnkiKm > sonKilometreRef.current) {
+                  sonKilometreRef.current = suAnkiKm;
+                  triggerHaptic("milestone");
+                  speakFeedback(`${suAnkiKm} kilometre tamamlandı.`);
+                }
+
+                return yeniMesafe;
+              });
             }
           }
           return [...onceki, yeniNokta];
@@ -128,12 +149,15 @@ export function GpsTracker() {
     );
   };
 
-const antrenmaniBitir = () => {
+  const antrenmaniBitir = () => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
     setAktif(false);
+
+    triggerHaptic("stop");
+    speakFeedback(`Antrenman tamamlandı. ${mesafe.toFixed(2)} kilometre.`);
 
     if (mesafe > 0 || sure > 5) {
       const yeniAktivite = {
@@ -148,7 +172,16 @@ const antrenmaniBitir = () => {
 
       setAktiviteler((prev) => [yeniAktivite, ...prev]);
 
-      // Zustand store'daki Taslak tipine tam uyumlu kayıt:
+      // Çevrimdışı koruma: Ayar açıksa yerel senkronizasyon kuyruğuna da ekle
+      if (settings.offlineSync) {
+        try {
+          const offlineQueue = JSON.parse(localStorage.getItem("scoutfit_offline_queue") || "[]");
+          offlineQueue.push(yeniAktivite);
+          localStorage.setItem("scoutfit_offline_queue", JSON.stringify(offlineQueue));
+        } catch {}
+      }
+
+      // Zustand store kaydı
       if (typeof ekleAntrenman === "function") {
         ekleAntrenman({
           bolge: "Yürüyüş / Koşu (GPS)",
@@ -188,7 +221,11 @@ const antrenmaniBitir = () => {
           <Marker position={simdikiKonum}>
             <Popup>Anlık Konumun 🚀</Popup>
           </Marker>
-          {rota.length > 1 && <Polyline positions={rota} color="#6f9f87" weight={5} />}
+          
+          {/* Canlı Rota Çizgisi: Kullanıcı ayarına bağlı render */}
+          {settings.livePolyline && rota.length > 1 && (
+            <Polyline positions={rota} color="#6f9f87" weight={5} />
+          )}
         </MapContainer>
       </div>
 

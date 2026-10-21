@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ScoutFit</string>
+    <string name="title_activity_main">ScoutFit</string>
+    <string name="package_name">com.scoutfit.app</string>
+    <string name="custom_url_scheme">com.scoutfit.app</string>
+</resources>

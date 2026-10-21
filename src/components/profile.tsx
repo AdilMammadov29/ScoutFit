@@ -3,6 +3,7 @@ import { fmtKcal, profildenHesap, tempoCumlesi } from "../lib/engine";
 import { useFit } from "../lib/store";
 import { useAuth } from "../lib/authStore";
 import { useEkstra, type Birim, type KiloKaydi } from "../lib/extras";
+import { useSettingsStore } from "../lib/settingsStore";
 import type { Section } from "./shell";
 import { Btn, PageTitle, Panel, Row } from "./ui";
 import { tumVeriyiSifirla } from "@/lib/sync";
@@ -42,9 +43,9 @@ function Alan({ etiket, children }: { etiket: string; children: ReactNode }) {
 function KisiselPanel() {
   const profil = useFit((s) => s.profil);
   const kaydetProfil = useFit((s) => s.kaydetProfil);
-  const ad = useEkstra((s:any) => s.ad);
-  const setAd = useEkstra((s:any) => s.setAd);
-  const ekleKilo = useEkstra((s:any) => s.ekleKilo);
+  const ad = useEkstra((s: any) => s.ad);
+  const setAd = useEkstra((s: any) => s.setAd);
+  const ekleKilo = useEkstra((s: any) => s.ekleKilo);
   const [adForm, setAdForm] = useState(ad);
   const [boy, setBoy] = useState(String(profil?.boy ?? ""));
   const [kilo, setKilo] = useState(String(profil?.kilo ?? ""));
@@ -228,9 +229,9 @@ function KiloGrafik({
 function KiloPanel() {
   const profil = useFit((s) => s.profil);
   const kayitlar = useEkstra((s: any) => s.kiloKayitlari) || [];
-  const birim = useEkstra((s :any) => s.birim);
-  const ekleKilo = useEkstra((s:any) => s.ekleKilo);
-  const silKilo = useEkstra((s:any) => s.silKilo);
+  const birim = useEkstra((s: any) => s.birim);
+  const ekleKilo = useEkstra((s: any) => s.ekleKilo);
+  const silKilo = useEkstra((s: any) => s.silKilo);
   const [giris, setGiris] = useState("");
   const [not, setNot] = useState("");
 
@@ -305,6 +306,10 @@ function AyarPanel() {
   const temizleAntrenman = useFit((s: any) => s.temizleAntrenman);
   const temizleSohbet = useFit((s: any) => s.temizleSohbet);
 
+  // ScoutFit yeni tercihler
+  const settings = useSettingsStore((s) => s.settings);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
+
   const sor = (mesaj: string, islem: () => void) => () => {
     if (window.confirm(mesaj)) islem();
   };
@@ -316,7 +321,7 @@ function AyarPanel() {
 
   return (
     <Panel title="Ayarlar">
-      <div className="space-y-5 py-5">
+      <div className="space-y-6 py-5">
         <div>
           <p className="mb-2 text-sm text-muted">Birim (kilo takibi ve hedef özeti)</p>
           <div className="flex gap-3">
@@ -328,6 +333,7 @@ function AyarPanel() {
             </Btn>
           </div>
         </div>
+
         <div>
           <p className="mb-2 text-sm text-muted">Tema</p>
           <div className="flex gap-3">
@@ -339,7 +345,68 @@ function AyarPanel() {
             </Btn>
           </div>
         </div>
-        <div>
+
+        {/* Antrenman ve Donanım Tercihleri */}
+        <div className="border-t border-line pt-4">
+          <p className="mb-3 text-sm font-medium text-ink">Antrenman & GPS Tercihleri</p>
+          <div className="space-y-3">
+            
+            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
+              <div>
+                <p className="text-sm font-medium text-ink">Canlı Rota Çizgisi</p>
+                <p className="text-xs text-muted">Haritada yürüdüğün yolu anlık çiz</p>
+              </div>
+              <Btn
+                tone={settings.livePolyline ? "primary" : "quiet"}
+                onClick={() => updateSetting("livePolyline", !settings.livePolyline)}
+              >
+                {settings.livePolyline ? "Açık" : "Kapalı"}
+              </Btn>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
+              <div>
+                <p className="text-sm font-medium text-ink">Sesli Geri Bildirim</p>
+                <p className="text-xs text-muted">Kilometre ve antrenman anonsları</p>
+              </div>
+              <Btn
+                tone={settings.voiceFeedback ? "primary" : "quiet"}
+                onClick={() => updateSetting("voiceFeedback", !settings.voiceFeedback)}
+              >
+                {settings.voiceFeedback ? "Açık" : "Kapalı"}
+              </Btn>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
+              <div>
+                <p className="text-sm font-medium text-ink">Titreşim (Haptic)</p>
+                <p className="text-xs text-muted">Başlat, bitir ve kilometre titreşimleri</p>
+              </div>
+              <Btn
+                tone={settings.haptics ? "primary" : "quiet"}
+                onClick={() => updateSetting("haptics", !settings.haptics)}
+              >
+                {settings.haptics ? "Açık" : "Kapalı"}
+              </Btn>
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
+              <div>
+                <p className="text-sm font-medium text-ink">Çevrimdışı Kayıt</p>
+                <p className="text-xs text-muted">İnternet yokken rotayı cihazda sakla</p>
+              </div>
+              <Btn
+                tone={settings.offlineSync ? "primary" : "quiet"}
+                onClick={() => updateSetting("offlineSync", !settings.offlineSync)}
+              >
+                {settings.offlineSync ? "Açık" : "Kapalı"}
+              </Btn>
+            </div>
+
+          </div>
+        </div>
+
+        <div className="border-t border-line pt-4">
           <p className="mb-2 text-sm text-muted">Verileri sıfırla</p>
           <div className="flex flex-wrap gap-3">
             <Btn
@@ -365,8 +432,8 @@ function AyarPanel() {
 }
 
 export function ProfilView({ git }: { git: (s: Section) => void }) {
-  const profil = useFit((s:any) => s.profil);
-  const ad = useEkstra((s:any) => s.ad);
+  const profil = useFit((s: any) => s.profil);
+  const ad = useEkstra((s: any) => s.ad);
 
   return (
     <div>
@@ -376,7 +443,6 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
         lede="Bilgilerin, kilo geçmişin ve ayarların tek yerde."
       />
       <div className="space-y-6">
-        
         <HesapPanel />
 
         {!profil ? (
@@ -396,7 +462,6 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
         )}
         
         <AyarPanel />
-        
       </div>
     </div>
   );
