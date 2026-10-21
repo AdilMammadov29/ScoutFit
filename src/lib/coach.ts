@@ -57,19 +57,13 @@ export async function kocSor({ data }: { data: KocGirdi }) {
         Authorization: `Bearer ${String(apiKey).trim()}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        temperature: 0.4,
+        model: "openai/gpt-oss-120b",
+        temperature: 0.7,
         max_tokens: 700,
         messages: [
           {
             role: "system",
-            content: `Sen ScoutFit koçusun. Türkçe, sakin, kısa ve somut konuş.
-Profil: ${baglam || "profil yok"}.
-Kurallar:
-- Boy veya kilo dökümüyle başlama. Doğrudan soruyu yanıtla.
-- En fazla 90 kelime. Gerekirse en fazla 4 madde.
-- Tıbbi teşhis koyma. Güvenli tempo haftada 0,3–0,7 kg.
-- Emoji kullanma.`,
+            content: `Sen ScoutFit fitness koçusun. Türkçe, samimi, kısa ve net yanıtlar ver. Profil: ${baglam || "belirtilmedi"}.`,
           },
           { role: "user", content: soru },
         ],
@@ -78,7 +72,7 @@ Kurallar:
 
     if (!res.ok) {
       const errBody = await res.text();
-      console.error("Koç API Hatası:", res.status, errBody.slice(0, 300));
+      console.error("Koç API Hatası:", res.status, errBody);
       return { ok: false as const, hata: `http-${res.status}` };
     }
 
