@@ -10,49 +10,64 @@ export function bugunAnahtar(tarih = new Date()) {
 function ayikla(text: string): YemekOge[] | null {
   try {
     const temiz = text.replace(/```json|```/gi, "").trim();
-    const bas = temiz.indexOf("[");
-    const son = temiz.lastIndexOf("]");
 
-    if (bas < 0 || son <= bas) {
-      console.error("Ayıklama Hatası: Köşeli parantez bulunamadı.", text);
-      return null;
+    // 1. Dizi formatını dene: [...]
+    const basDizi = temiz.indexOf("[");
+    const sonDizi = temiz.lastIndexOf("]");
+    if (basDizi >= 0 && sonDizi > basDizi) {
+      const parsed = JSON.parse(temiz.slice(basDizi, sonDizi + 1));
+      if (Array.isArray(parsed)) {
+        const ogeler = parseOgeler(parsed);
+        if (ogeler.length) return ogeler;
+      }
     }
 
-    const parsed = JSON.parse(temiz.slice(bas, son + 1));
-    if (!Array.isArray(parsed)) return null;
-
-    const ogeler: YemekOge[] = [];
-    for (const oge of parsed.slice(0, 6)) {
-      const ad = String(oge?.ad ?? "").trim().slice(0, 80);
-      const kcal = Math.round(Number(oge?.kcal));
-      if (!ad || !Number.isFinite(kcal) || kcal < 0 || kcal > 2500) continue;
-      ogeler.push({ ad, kcal });
+    // 2. Tek nesne formatını dene: {...}
+    const basNesne = temiz.indexOf("{");
+    const sonNesne = temiz.lastIndexOf("}");
+    if (basNesne >= 0 && sonNesne > basNesne) {
+      const parsed = JSON.parse(temiz.slice(basNesne, sonNesne + 1));
+      const ogeler = parseOgeler(Array.isArray(parsed) ? parsed : [parsed]);
+      if (ogeler.length) return ogeler;
     }
-    return ogeler.length ? ogeler : null;
+
+    return null;
   } catch (err) {
-    console.error("Ayıklama Çöktü:", err, text);
+    console.error("Ayıklama Hatası:", err, text);
     return null;
   }
 }
 
-const ISTEM = `Sen bir kalori hesaplama asistanısın. Kullanıcı yediği ya da içtiği şeyi yazar. 
-Cevabın SADECE şu biçimde bir JSON dizisi olmalı, başka hiçbir metin yazma:
-[{ "ad": "Kısa Türkçe ad", "kcal": 150 }]
+function parseOgeler(liste: any[]): YemekOge[] {
+  const sonuc: YemekOge[] = [];
+  for (const oge of liste.slice(0, 10)) {
+    const ad = String(oge?.ad ?? oge?.isim ?? "").trim().slice(0, 80);
+    const kcal = Math.round(Number(oge?.kcal ?? oge?.kalori));
+    // 0 kcal (su, sade americano vb.) geçerli bir kaloridir
+    if (!ad || !Number.isFinite(kcal) || kcal < 0 || kcal > 4000) continue;
+    sonuc.push({ ad, kcal });
+  }
+  return sonuc;
+}
 
-KRİTİK KURALLAR:
-1. "Tane", "Dilim", "Paket" ve "Gram" ayrımlarına ÇOK DİKKAT ET. 
-2. Paketli ürünlerde (Biscolata, Halley, Probis vb.) kullanıcı "tane" diyorsa, SADECE 1 TEK ADEDİN kalorisini bulup girilen sayıyla çarp. Asla paket kalorisi yazma! (Örn: 1 tane Biscolata Pia ~45 kcal'dir, 2 tane yazıldıysa 90 kcal hesapla).
-3. Miktar belirtilmemişse 1 standart porsiyon/adet varsay.
-4. Şekersiz çay/kahve 2-5 kcal arasıdır.
-5. Sadece geçerli bir JSON döndür, açıklama yapma.`;
+const ISTEM = `Sen bir beslenme ve kalori hesaplama uzmanısın. Kullanıcı yediği veya içtiği besinleri yazar (örneğin: "250 ml ice americano" veya "150g tavuk ve pilav").
+Görevin bu besinlerin tahmini kalorisini hesaplamaktır. Sade filtre kahve, americano, maden suyu gibi içeceklerin kalorisi 0 ile 10 kcal arasında olabilir, sıfır kalori olması geçerlidir.
 
-export async function yemekHesapla({ data }: { data: { metin?: string } }) {
-  const metin = String(data?.metin ?? "").trim().slice(0, 300);
-  if (!metin) return { ok: false as const, hata: "bos" };
+Yanıtını SADECE ve KESİNLİKLE aşağıdaki geçerli JSON dizi formatında ver, başka hiçbir açıklama veya selamlama yazma:
+[{"ad": "Ice Americano (250 ml)", "kcal": 5}]`;
 
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+export async function yemekHesapla({ data }: { data: { metin: string } }) {
+  const metin = data.metin.trim();
+  if (!metin) {
+    return { ok: false as const, hata: "bos" };
+  }
+
+  const apiKey =
+    import.meta.env.VITE_GROQ_API_KEY ||
+    (typeof process !== "undefined" ? process.env?.VITE_GROQ_API_KEY : "") ||
+    "";
+
   if (!apiKey) {
-    console.error("HATA: VITE_GROQ_API_KEY bulunamadı!");
     return { ok: false as const, hata: "yok" };
   }
 
@@ -64,9 +79,9 @@ export async function yemekHesapla({ data }: { data: { metin?: string } }) {
         Authorization: `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
+        model: "llama-3.3-70b-versatile",
         temperature: 0.1,
-        max_tokens: 1200,
+        max_tokens: 500,
         messages: [
           { role: "system", content: ISTEM },
           { role: "user", content: metin },

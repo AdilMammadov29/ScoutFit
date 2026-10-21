@@ -39,7 +39,7 @@ type KocGirdi = { soru: string; baglam?: string };
 export async function kocSor({ data }: { data: KocGirdi }) {
   const soru = String(data?.soru ?? "").trim().slice(0, 600);
   const baglam = String(data?.baglam ?? "").trim().slice(0, 500);
-  
+
   if (!soru) return { ok: false as const, hata: "bos" };
 
   const apiKey = import.meta.env.VITE_GROQ_API_KEY;
@@ -54,10 +54,10 @@ export async function kocSor({ data }: { data: KocGirdi }) {
       signal: AbortSignal.timeout(25000),
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${String(apiKey).trim()}`,
+        Authorization: `Bearer ${String(apiKey).trim()}`,
       },
       body: JSON.stringify({
-     model: "openai/gpt-oss-120b",
+        model: "llama-3.1-8b-instant",
         temperature: 0.4,
         max_tokens: 700,
         messages: [
@@ -85,10 +85,10 @@ Kurallar:
     const body = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
     };
-    
+
     const text = body.choices?.[0]?.message?.content?.trim() ?? "";
     if (text) return { ok: true as const, metin: text };
-    
+
     return { ok: false as const, hata: "bos-yanit" };
   } catch (err) {
     console.error("Koç bağlantı hatası:", err);
