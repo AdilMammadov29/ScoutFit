@@ -66,7 +66,7 @@ export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
-        temperature: 0.1, // Tutarlılık için sıcaklığı 0.1'e çektik
+        temperature: 0.1,
         max_tokens: 1200,
         response_format: { type: "json_object" },
         messages: [
@@ -83,14 +83,31 @@ export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
     }
 
     const body = await res.json();
-    const rawContent = body.choices?.[0]?.message?.content?.trim() ?? "";
+    let rawContent = body.choices?.[0]?.message?.content?.trim() ?? "";
+
+    // Olası markdown json bloklarını ayıkla
+    if (rawContent.startsWith("```")) {
+      rawContent = rawContent.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    }
+
     const parsed = JSON.parse(rawContent);
 
-    const ogeler: BesinOgesi[] = Array.isArray(parsed.ogeler) ? parsed.ogeler : [];
+    // Tip güvenliği ve sayısal doğrulama
+    const hamOgeler = Array.isArray(parsed.ogeler) ? parsed.ogeler : [];
+    const ogeler: BesinOgesi[] = hamOgeler.map((o: any) => ({
+      ad: String(o.ad || "Bilinmeyen Besin"),
+      porsiyon: o.porsiyon ? String(o.porsiyon) : undefined,
+      kalori: Math.round(Number(o.kalori) || 0),
+      protein: Math.round(Number(o.protein) || 0),
+      karb: Math.round(Number(o.karb) || 0),
+      yag: Math.round(Number(o.yag) || 0),
+    }));
+
+    const hesaplananToplam = ogeler.reduce((acc, cur) => acc + cur.kalori, 0);
     const toplamKalori =
-      typeof parsed.toplamKalori === "number"
-        ? parsed.toplamKalori
-        : ogeler.reduce((acc, cur) => acc + (Number(cur.kalori) || 0), 0);
+      typeof parsed.toplamKalori === "number" && !isNaN(parsed.toplamKalori)
+        ? Math.round(parsed.toplamKalori)
+        : hesaplananToplam;
 
     return { ok: true, ogeler, toplamKalori };
   } catch (err) {
