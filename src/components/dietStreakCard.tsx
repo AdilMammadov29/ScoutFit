@@ -1,4 +1,3 @@
-
 import { useDiet, type GunDurumu } from "../lib/dietStore";
 export function DietStreakCard() {
   const { seri, bugunkuDurum, telafiPlani, durumSec } = useDiet();
