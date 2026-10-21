@@ -2,6 +2,7 @@ export type BesinOgesi = {
   ad: string;
   porsiyon?: string;
   kalori: number;
+  kcal: number;
   protein: number;
   karb: number;
   yag: number;
@@ -10,6 +11,16 @@ export type BesinOgesi = {
 export type YemekAnalizSonuc =
   | { ok: true; ogeler: BesinOgesi[]; toplamKalori: number }
   | { ok: false; hata: string };
+
+export type YemekGirdi = string | { data: { metin: string } };
+
+export function bugunAnahtar(): string {
+  const simdi = new Date();
+  const yil = simdi.getFullYear();
+  const ay = String(simdi.getMonth() + 1).padStart(2, "0");
+  const gun = String(simdi.getDate()).padStart(2, "0");
+  return `${yil}-${ay}-${gun}`;
+}
 
 const SISTEM_ISTEMI = `Sen ScoutFit uygulamasının profesyonel beslenme ve kalori veri tabanısın.
 Kullanıcının girdiği öğünleri, besinleri ve gramajları gerçekçi besin değerleriyle analiz et.
@@ -34,6 +45,7 @@ Format:
       "ad": "Besin Adı",
       "porsiyon": "Miktar (örn: 100g)",
       "kalori": 510,
+      "kcal": 510,
       "protein": 5,
       "karb": 65,
       "yag": 26
@@ -42,7 +54,12 @@ Format:
   "toplamKalori": 510
 }`;
 
-export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
+export async function yemekHesapla(girdiParam: YemekGirdi): Promise<YemekAnalizSonuc> {
+  const metin =
+    typeof girdiParam === "string"
+      ? girdiParam
+      : (girdiParam as { data?: { metin?: string } })?.data?.metin ?? "";
+      
   const girdi = metin.trim();
   if (!girdi) return { ok: false, hata: "Metin boş olamaz." };
 
@@ -85,23 +102,25 @@ export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
     const body = await res.json();
     let rawContent = body.choices?.[0]?.message?.content?.trim() ?? "";
 
-    // Olası markdown json bloklarını ayıkla
     if (rawContent.startsWith("```")) {
       rawContent = rawContent.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
     }
 
     const parsed = JSON.parse(rawContent);
 
-    // Tip güvenliği ve sayısal doğrulama
     const hamOgeler = Array.isArray(parsed.ogeler) ? parsed.ogeler : [];
-    const ogeler: BesinOgesi[] = hamOgeler.map((o: any) => ({
-      ad: String(o.ad || "Bilinmeyen Besin"),
-      porsiyon: o.porsiyon ? String(o.porsiyon) : undefined,
-      kalori: Math.round(Number(o.kalori) || 0),
-      protein: Math.round(Number(o.protein) || 0),
-      karb: Math.round(Number(o.karb) || 0),
-      yag: Math.round(Number(o.yag) || 0),
-    }));
+    const ogeler: BesinOgesi[] = hamOgeler.map((o: any) => {
+      const cal = Math.round(Number(o.kalori ?? o.kcal) || 0);
+      return {
+        ad: String(o.ad || "Bilinmeyen Besin"),
+        porsiyon: o.porsiyon ? String(o.porsiyon) : undefined,
+        kalori: cal,
+        kcal: cal,
+        protein: Math.round(Number(o.protein) || 0),
+        karb: Math.round(Number(o.karb) || 0),
+        yag: Math.round(Number(o.yag) || 0),
+      };
+    });
 
     const hesaplananToplam = ogeler.reduce((acc, cur) => acc + cur.kalori, 0);
     const toplamKalori =
@@ -115,3 +134,5 @@ export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
     return { ok: false, hata: "analiz_hatasi" };
   }
 }
+
+export const yemekAnalizEt = yemekHesapla;
