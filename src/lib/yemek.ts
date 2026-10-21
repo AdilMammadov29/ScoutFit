@@ -1,66 +1,37 @@
-export type YemekOge = { ad: string; kcal: number };
+export type BesinOgesi = {
+  ad: string;
+  porsiyon?: string;
+  kalori: number;
+  protein: number;
+  karb: number;
+  yag: number;
+};
 
-export function bugunAnahtar(tarih = new Date()) {
-  const y = tarih.getFullYear();
-  const a = String(tarih.getMonth() + 1).padStart(2, "0");
-  const g = String(tarih.getDate()).padStart(2, "0");
-  return `${y}-${a}-${g}`;
-}
+export type YemekAnalizSonuc =
+  | { ok: true; ogeler: BesinOgesi[]; toplamKalori: number }
+  | { ok: false; hata: string };
 
-function ayikla(text: string): YemekOge[] | null {
-  try {
-    const temiz = text.replace(/```json|```/gi, "").trim();
-
-    // 1. Dizi formatını dene: [...]
-    const basDizi = temiz.indexOf("[");
-    const sonDizi = temiz.lastIndexOf("]");
-    if (basDizi >= 0 && sonDizi > basDizi) {
-      const parsed = JSON.parse(temiz.slice(basDizi, sonDizi + 1));
-      if (Array.isArray(parsed)) {
-        const ogeler = parseOgeler(parsed);
-        if (ogeler.length) return ogeler;
-      }
+const SISTEM_ISTEMI = `Sen ScoutFit uygulamasının beslenme ve kalori uzmanısın.
+Kullanıcının girdiği yemek/öğün açıklamasını analiz et.
+Yanıtını YALNIZCA geçerli bir JSON objesi formatında döndür. Açıklama, markdown etiketi (\`\`\`json) veya selamlama yazma.
+Beklenen JSON formatı:
+{
+  "ogeler": [
+    {
+      "ad": "Yemek/Besin Adı",
+      "porsiyon": "Miktar (örn: 200g, 1 tabak)",
+      "kalori": 250,
+      "protein": 30,
+      "karb": 20,
+      "yag": 5
     }
+  ],
+  "toplamKalori": 250
+}`;
 
-    // 2. Tek nesne formatını dene: {...}
-    const basNesne = temiz.indexOf("{");
-    const sonNesne = temiz.lastIndexOf("}");
-    if (basNesne >= 0 && sonNesne > basNesne) {
-      const parsed = JSON.parse(temiz.slice(basNesne, sonNesne + 1));
-      const ogeler = parseOgeler(Array.isArray(parsed) ? parsed : [parsed]);
-      if (ogeler.length) return ogeler;
-    }
-
-    return null;
-  } catch (err) {
-    console.error("Ayıklama Hatası:", err, text);
-    return null;
-  }
-}
-
-function parseOgeler(liste: any[]): YemekOge[] {
-  const sonuc: YemekOge[] = [];
-  for (const oge of liste.slice(0, 10)) {
-    const ad = String(oge?.ad ?? oge?.isim ?? "").trim().slice(0, 80);
-    const kcal = Math.round(Number(oge?.kcal ?? oge?.kalori));
-    // 0 kcal (su, sade americano vb.) geçerli bir kaloridir
-    if (!ad || !Number.isFinite(kcal) || kcal < 0 || kcal > 4000) continue;
-    sonuc.push({ ad, kcal });
-  }
-  return sonuc;
-}
-
-const ISTEM = `Sen bir beslenme ve kalori hesaplama uzmanısın. Kullanıcı yediği veya içtiği besinleri yazar (örneğin: "250 ml ice americano" veya "150g tavuk ve pilav").
-Görevin bu besinlerin tahmini kalorisini hesaplamaktır. Sade filtre kahve, americano, maden suyu gibi içeceklerin kalorisi 0 ile 10 kcal arasında olabilir, sıfır kalori olması geçerlidir.
-
-Yanıtını SADECE ve KESİNLİKLE aşağıdaki geçerli JSON dizi formatında ver, başka hiçbir açıklama veya selamlama yazma:
-[{"ad": "Ice Americano (250 ml)", "kcal": 5}]`;
-
-export async function yemekHesapla({ data }: { data: { metin: string } }) {
-  const metin = data.metin.trim();
-  if (!metin) {
-    return { ok: false as const, hata: "bos" };
-  }
+export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
+  const girdi = metin.trim();
+  if (!girdi) return { ok: false, hata: "Metin boş olamaz." };
 
   const apiKey =
     import.meta.env.VITE_GROQ_API_KEY ||
@@ -68,47 +39,49 @@ export async function yemekHesapla({ data }: { data: { metin: string } }) {
     "";
 
   if (!apiKey) {
-    return { ok: false as const, hata: "yok" };
+    console.error("Groq API anahtarı bulunamadı.");
+    return { ok: false, hata: "api_key_eksik" };
   }
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
+      signal: AbortSignal.timeout(25000),
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey.trim()}`,
+        Authorization: `Bearer ${String(apiKey).trim()}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        temperature: 0.1,
-        max_tokens: 500,
+        model: "openai/gpt-oss-120b",
+        temperature: 0.2,
+        max_tokens: 1200,
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: ISTEM },
-          { role: "user", content: metin },
+          { role: "system", content: SISTEM_ISTEMI },
+          { role: "user", content: `Öğünü analiz et: ${girdi}` },
         ],
       }),
     });
 
     if (!res.ok) {
-      const errorText = await res.text();
-      console.error(`API Hatası (${res.status}):`, errorText);
-      return { ok: false as const, hata: `http-${res.status}` };
+      const errBody = await res.text();
+      console.error("API Hatası (" + res.status + "):", errBody);
+      return { ok: false, hata: `http-${res.status}` };
     }
 
     const body = await res.json();
-    const textContent = body.choices?.[0]?.message?.content ?? "";
-    console.log("Groq'dan gelen ham cevap:", textContent);
+    const rawContent = body.choices?.[0]?.message?.content?.trim() ?? "";
+    const parsed = JSON.parse(rawContent);
 
-    const ogeler = ayikla(textContent);
+    const ogeler: BesinOgesi[] = Array.isArray(parsed.ogeler) ? parsed.ogeler : [];
+    const toplamKalori =
+      typeof parsed.toplamKalori === "number"
+        ? parsed.toplamKalori
+        : ogeler.reduce((acc, cur) => acc + (Number(cur.kalori) || 0), 0);
 
-    if (!ogeler) {
-      console.error("Ayıklanamayan Yanıt:", textContent);
-      return { ok: false as const, hata: "ayiklanamadi" };
-    }
-
-    return { ok: true as const, ogeler };
+    return { ok: true, ogeler, toplamKalori };
   } catch (err) {
-    console.error("Ağ Hatası:", err);
-    return { ok: false as const, hata: "ag" };
+    console.error("Yemek analiz hatası:", err);
+    return { ok: false, hata: "analiz_hatasi" };
   }
 }
