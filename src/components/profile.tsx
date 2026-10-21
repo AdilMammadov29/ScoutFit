@@ -1,12 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { fmtKcal, profildenHesap, tempoCumlesi } from "../lib/engine";
 import { useFit } from "../lib/store";
-import { useAuth } from "../lib/authStore";
 import { useEkstra, type Birim, type KiloKaydi } from "../lib/extras";
-import { useSettingsStore } from "../lib/settingsStore";
 import type { Section } from "./shell";
 import { Btn, PageTitle, Panel, Row } from "./ui";
-import { tumVeriyiSifirla } from "@/lib/sync";
 
 const LB = 2.20462;
 const alanClass =
@@ -46,7 +42,8 @@ function KisiselPanel() {
   const ad = useEkstra((s: any) => s.ad);
   const setAd = useEkstra((s: any) => s.setAd);
   const ekleKilo = useEkstra((s: any) => s.ekleKilo);
-  const [adForm, setAdForm] = useState(ad);
+
+  const [adForm, setAdForm] = useState(ad || "");
   const [boy, setBoy] = useState(String(profil?.boy ?? ""));
   const [kilo, setKilo] = useState(String(profil?.kilo ?? ""));
   const [yas, setYas] = useState(String(profil?.yas ?? ""));
@@ -64,13 +61,13 @@ function KisiselPanel() {
     kaydetProfil({ ...profil, boy: b, kilo: k, yas: Math.round(y) });
     setAd(adForm.trim().slice(0, 40));
     if (k !== profil.kilo) ekleKilo(k);
-    setNot("Kaydedildi.");
+    setNot("Bilgiler güncellendi.");
   };
 
   return (
-    <Panel title="Kişisel bilgiler">
+    <Panel title="Kişisel Bilgiler ve Ölçüler">
       <div className="grid gap-4 py-5 sm:grid-cols-2">
-        <Alan etiket="Ad">
+        <Alan etiket="Ad Soyad">
           <input
             className={alanClass}
             value={adForm}
@@ -94,7 +91,7 @@ function KisiselPanel() {
             onChange={(e) => setBoy(e.target.value)}
           />
         </Alan>
-        <Alan etiket="Kilo (kg)">
+        <Alan etiket="Mevcut Kilo (kg)">
           <input
             className={alanClass}
             value={kilo}
@@ -111,46 +108,57 @@ function KisiselPanel() {
   );
 }
 
-function HesapPanel() {
-  const currentUser = useAuth((s: any) => s.currentUser);
-  const accounts = useAuth((s: any) => s.accounts);
-  const logout = useAuth((s: any) => s.logout);
-  const switchAccount = useAuth((s: any) => s.switchAccount);
-  const removeAccount = useAuth((s: any) => s.removeAccount);
+function HedeflerPanel() {
+  const [haftalikKm, setHaftalikKm] = useState(
+    () => localStorage.getItem("scoutfit_hedef_km") || "20",
+  );
+  const [hedefHiz, setHedefHiz] = useState(
+    () => localStorage.getItem("scoutfit_hedef_hiz") || "27",
+  );
+  const [haftalikGun, setHaftalikGun] = useState(
+    () => localStorage.getItem("scoutfit_hedef_gun") || "4",
+  );
+  const [kaydedildi, setKaydedildi] = useState(false);
 
-  if (!currentUser) return null;
+  const kaydetHedefler = () => {
+    localStorage.setItem("scoutfit_hedef_km", haftalikKm);
+    localStorage.setItem("scoutfit_hedef_hiz", hedefHiz);
+    localStorage.setItem("scoutfit_hedef_gun", haftalikGun);
+    setKaydedildi(true);
+    setTimeout(() => setKaydedildi(false), 2500);
+  };
 
   return (
-    <Panel title="Hesap Yönetimi">
-      <div className="space-y-4 py-5">
-        <p className="text-sm text-muted">
-          Aktif Hesap: <span className="font-medium text-ink">{currentUser.name}</span>
-        </p>
-        
-        {accounts.length > 1 && (
-          <div>
-            <p className="mb-2 text-sm text-muted">Diğer Hesaplar</p>
-            <div className="flex flex-col gap-2">
-              {accounts.filter((a: any) => a.id !== currentUser.id).map((acc: any) => (
-                <div key={acc.id} className="flex items-center justify-between rounded-xl border border-line bg-cream px-3 py-2">
-                  <span className="text-sm text-ink">{acc.name}</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => switchAccount(acc.id)} className="text-xs font-medium text-pine">Geçiş Yap</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-3 pt-2">
-          <Btn tone="quiet" onClick={() => logout()}>Çıkış Yap / Yeni Hesap</Btn>
-          <Btn tone="quiet" onClick={() => {
-            if (window.confirm(`"${currentUser.name}" adlı bu hesabı cihazdan kalıcı olarak silmek istediğine emin misin?`)) {
-              removeAccount(currentUser.id);
-            }
-          }}>Hesabı Sil</Btn>
-        </div>
+    <Panel title="Dönemlik Hedefler">
+      <div className="grid gap-4 py-5 sm:grid-cols-3">
+        <Alan etiket="Haftalık Mesafe Hedefi (km)">
+          <input
+            className={alanClass}
+            value={haftalikKm}
+            inputMode="numeric"
+            onChange={(e) => setHaftalikKm(e.target.value)}
+          />
+        </Alan>
+        <Alan etiket="Hedef Max Hız (km/s)">
+          <input
+            className={alanClass}
+            value={hedefHiz}
+            inputMode="numeric"
+            onChange={(e) => setHedefHiz(e.target.value)}
+          />
+        </Alan>
+        <Alan etiket="Haftalık Antrenman Sıklığı (Gün)">
+          <input
+            className={alanClass}
+            value={haftalikGun}
+            inputMode="numeric"
+            onChange={(e) => setHaftalikGun(e.target.value)}
+          />
+        </Alan>
+      </div>
+      <div className="flex items-center gap-4 pb-5">
+        <Btn onClick={kaydetHedefler}>Hedefleri Güncelle</Btn>
+        {kaydedildi ? <p className="text-sm text-pine font-medium">Hedefler kaydedildi.</p> : null}
       </div>
     </Panel>
   );
@@ -167,7 +175,10 @@ function KiloGrafik({
   birim: Birim;
   guncelKilo?: number;
 }) {
-  const aktifKayitlar = kayitlar.length > 0 ? kayitlar : [{ id: "varsayilan", kilo: guncelKilo ?? 75, tarih: new Date().toISOString() }];
+  const aktifKayitlar =
+    kayitlar.length > 0
+      ? kayitlar
+      : [{ id: "varsayilan", kilo: guncelKilo ?? 75, tarih: new Date().toISOString() }];
 
   const W = 560;
   const H = 200;
@@ -178,8 +189,9 @@ function KiloGrafik({
   const tum = hedefD !== undefined ? [...degerler, hedefD] : degerler;
   const min = Math.min(...tum) - 1;
   const max = Math.max(...tum) + 1;
-  
-  const x = (i: number) => aktifKayitlar.length === 1 ? W / 2 : P + (i * (W - 2 * P)) / (aktifKayitlar.length - 1);
+
+  const x = (i: number) =>
+    aktifKayitlar.length === 1 ? W / 2 : P + (i * (W - 2 * P)) / (aktifKayitlar.length - 1);
   const y = (v: number) => H - P - ((v - min) / (max - min)) * (H - 2 * P);
   const nokta = degerler.map((v, i) => `${x(i)},${y(v)}`).join(" ");
 
@@ -247,14 +259,23 @@ function KiloPanel() {
 
   const ilk = kayitlar[0];
   const son = kayitlar[kayitlar.length - 1];
-  const fark = ilk && son ? (birim === "lb" ? (son.kilo - ilk.kilo) * LB : son.kilo - ilk.kilo) : 0;
+  const fark =
+    ilk && son ? (birim === "lb" ? (son.kilo - ilk.kilo) * LB : son.kilo - ilk.kilo) : 0;
   const sonBes = kayitlar.slice(-5).reverse();
 
   return (
-    <Panel title="Kilo takibi">
-      <KiloGrafik kayitlar={kayitlar} hedef={profil?.hedefKilo} birim={birim} guncelKilo={profil?.kilo} />
+    <Panel title="Kilo ve Gelişim">
+      <KiloGrafik
+        kayitlar={kayitlar}
+        hedef={profil?.hedefKilo}
+        birim={birim}
+        guncelKilo={profil?.kilo}
+      />
       {kayitlar.length >= 2 ? (
-        <Row label="Toplam değişim" value={`${fark > 0 ? "+" : ""}${sayiYaz(fark)} ${birim}`} />
+        <Row
+          label="Toplam değişim"
+          value={`${fark > 0 ? "+" : ""}${sayiYaz(fark)} ${birim}`}
+        />
       ) : null}
       <div className="flex items-end gap-3 py-5">
         <div className="flex-1">
@@ -291,142 +312,10 @@ function KiloPanel() {
           ))}
         </ul>
       ) : (
-        <p className="pb-5 text-sm text-muted">Henüz geçmiş kayıt yok. Profilindeki kilo baz alınıyor.</p>
+        <p className="pb-5 text-sm text-muted">
+          Henüz geçmiş kayıt yok. Profilindeki kilo baz alınıyor.
+        </p>
       )}
-    </Panel>
-  );
-}
-
-function AyarPanel() {
-  const birim = useEkstra((s: any) => s.birim);
-  const setBirim = useEkstra((s: any) => s.setBirim);
-  const tema = useEkstra((s: any) => s.tema);
-  const setTema = useEkstra((s: any) => s.setTema);
-  const temizleKilo = useEkstra((s: any) => s.temizleKilo);
-  const temizleAntrenman = useFit((s: any) => s.temizleAntrenman);
-  const temizleSohbet = useFit((s: any) => s.temizleSohbet);
-
-  // ScoutFit yeni tercihler
-  const settings = useSettingsStore((s) => s.settings);
-  const updateSetting = useSettingsStore((s) => s.updateSetting);
-
-  const sor = (mesaj: string, islem: () => void) => () => {
-    if (window.confirm(mesaj)) islem();
-  };
-
-  const hepsiniSifirla = sor(
-    "Profil, antrenmanlar, sohbet, öğünler ve kilo kayıtları dahil hesabındaki tüm veriler silinecek. Emin misin?",
-    tumVeriyiSifirla,
-  );
-
-  return (
-    <Panel title="Ayarlar">
-      <div className="space-y-6 py-5">
-        <div>
-          <p className="mb-2 text-sm text-muted">Birim (kilo takibi ve hedef özeti)</p>
-          <div className="flex gap-3">
-            <Btn tone={birim === "kg" ? "primary" : "quiet"} onClick={() => setBirim("kg")}>
-              kg
-            </Btn>
-            <Btn tone={birim === "lb" ? "primary" : "quiet"} onClick={() => setBirim("lb")}>
-              lb
-            </Btn>
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm text-muted">Tema</p>
-          <div className="flex gap-3">
-            <Btn tone={tema === "acik" ? "primary" : "quiet"} onClick={() => setTema("acik")}>
-              Açık
-            </Btn>
-            <Btn tone={tema === "koyu" ? "primary" : "quiet"} onClick={() => setTema("koyu")}>
-              Koyu
-            </Btn>
-          </div>
-        </div>
-
-        {/* Antrenman ve Donanım Tercihleri */}
-        <div className="border-t border-line pt-4">
-          <p className="mb-3 text-sm font-medium text-ink">Antrenman & GPS Tercihleri</p>
-          <div className="space-y-3">
-            
-            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
-              <div>
-                <p className="text-sm font-medium text-ink">Canlı Rota Çizgisi</p>
-                <p className="text-xs text-muted">Haritada yürüdüğün yolu anlık çiz</p>
-              </div>
-              <Btn
-                tone={settings.livePolyline ? "primary" : "quiet"}
-                onClick={() => updateSetting("livePolyline", !settings.livePolyline)}
-              >
-                {settings.livePolyline ? "Açık" : "Kapalı"}
-              </Btn>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
-              <div>
-                <p className="text-sm font-medium text-ink">Sesli Geri Bildirim</p>
-                <p className="text-xs text-muted">Kilometre ve antrenman anonsları</p>
-              </div>
-              <Btn
-                tone={settings.voiceFeedback ? "primary" : "quiet"}
-                onClick={() => updateSetting("voiceFeedback", !settings.voiceFeedback)}
-              >
-                {settings.voiceFeedback ? "Açık" : "Kapalı"}
-              </Btn>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
-              <div>
-                <p className="text-sm font-medium text-ink">Titreşim (Haptic)</p>
-                <p className="text-xs text-muted">Başlat, bitir ve kilometre titreşimleri</p>
-              </div>
-              <Btn
-                tone={settings.haptics ? "primary" : "quiet"}
-                onClick={() => updateSetting("haptics", !settings.haptics)}
-              >
-                {settings.haptics ? "Açık" : "Kapalı"}
-              </Btn>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-line bg-cream p-3">
-              <div>
-                <p className="text-sm font-medium text-ink">Çevrimdışı Kayıt</p>
-                <p className="text-xs text-muted">İnternet yokken rotayı cihazda sakla</p>
-              </div>
-              <Btn
-                tone={settings.offlineSync ? "primary" : "quiet"}
-                onClick={() => updateSetting("offlineSync", !settings.offlineSync)}
-              >
-                {settings.offlineSync ? "Açık" : "Kapalı"}
-              </Btn>
-            </div>
-
-          </div>
-        </div>
-
-        <div className="border-t border-line pt-4">
-          <p className="mb-2 text-sm text-muted">Verileri sıfırla</p>
-          <div className="flex flex-wrap gap-3">
-            <Btn
-              tone="quiet"
-              onClick={sor("Tüm antrenmanlar silinsin mi?", temizleAntrenman)}
-            >
-              Antrenmanları sil
-            </Btn>
-            <Btn tone="quiet" onClick={sor("Koç sohbeti silinsin mi?", temizleSohbet)}>
-              Sohbeti temizle
-            </Btn>
-            <Btn tone="quiet" onClick={sor("Tüm kilo kayıtları silinsin mi?", temizleKilo)}>
-              Kilo kayıtlarını sil
-            </Btn>
-            <Btn tone="quiet" onClick={hepsiniSifirla}>
-              Her şeyi sıfırla
-            </Btn>
-          </div>
-        </div>
-      </div>
     </Panel>
   );
 }
@@ -440,11 +329,9 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
       <PageTitle
         index="06"
         title={ad ? ad : "Profil"}
-        lede="Bilgilerin, kilo geçmişin ve ayarların tek yerde."
+        lede="Fiziksel ölçülerin, hedeflerin ve gelişim grafiğin."
       />
       <div className="space-y-6">
-        <HesapPanel />
-
         {!profil ? (
           <Panel>
             <div className="py-6">
@@ -457,11 +344,10 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
         ) : (
           <>
             <KisiselPanel />
+            <HedeflerPanel />
             <KiloPanel />
           </>
         )}
-        
-        <AyarPanel />
       </div>
     </div>
   );

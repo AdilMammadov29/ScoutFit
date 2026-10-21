@@ -6,12 +6,13 @@ import { TodayView } from "@/components/today";
 import { TrainView } from "@/components/train";
 import { ProfilView } from "./profile";
 import { GpsTracker } from "./gps";
+import { SettingsModal } from "./settingsModal";
 import { useAuth } from "../lib/authStore";
 import { AuthView } from "./auth";
 import { supabase } from "@/lib/supabase";
 import { bulutuDurdur } from "@/lib/sync";
 
-export type Section = "today" | "goal" | "train" | "meals" | "coach" | "profile" | "gps";
+export type Section = "today" | "goal" | "train" | "meals" | "gps" | "coach" | "profile";
 
 const NAV: { id: Section; no: string; ad: string }[] = [
   { id: "today", no: "01", ad: "Bugün" },
@@ -20,12 +21,14 @@ const NAV: { id: Section; no: string; ad: string }[] = [
   { id: "meals", no: "04", ad: "Beslenme" },
   { id: "gps", no: "05", ad: "GPS & Rota" },
   { id: "coach", no: "06", ad: "Koç" },
+  { id: "profile", no: "07", ad: "Profil" },
 ];
 
 export function ScoutApp() {
   const currentUser = useAuth((s: any) => s.currentUser);
   const [section, setSection] = useState<Section>("today");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleCikis = async () => {
     bulutuDurdur();
@@ -37,11 +40,9 @@ export function ScoutApp() {
     return <AuthView />;
   }
 
-  const kullaniciAdi = typeof currentUser === "string" ? currentUser : currentUser.name || "Kullanıcı";
-  const basHarf = (kullaniciAdi.charAt(0) || "U").toUpperCase();
-
   return (
     <div className="min-h-dvh bg-paper text-ink flex flex-col font-sans">
+      {/* Üst Bar - Sadeleştirilmiş */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-paper/90 px-6 py-4 backdrop-blur md:px-10">
         <div className="flex items-center gap-4">
           <button 
@@ -51,29 +52,7 @@ export function ScoutApp() {
           >
             ☰
           </button>
-          <span className="font-display text-2xl font-bold text-pine md:hidden">ScoutFit</span>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSection("profile")}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all hover:scale-105 active:scale-95 ${
-              section === "profile" 
-                ? "bg-pine text-cream ring-4 ring-pine/20" 
-                : "border border-line bg-cream text-pine"
-            }`}
-            title={`Profil (${kullaniciAdi})`}
-          >
-            {basHarf}
-          </button>
-
-          <button
-            onClick={handleCikis}
-            className="rounded-xl border border-line bg-cream px-3 py-2 text-xs font-semibold text-muted hover:border-clay/50 hover:text-clay transition-all active:scale-95"
-            title="Çıkış Yap"
-          >
-            Çıkış Yap
-          </button>
+          <span className="font-display text-2xl font-bold text-pine">ScoutFit</span>
         </div>
       </header>
 
@@ -99,7 +78,7 @@ export function ScoutApp() {
               </div>
               <button 
                 className="text-2xl text-muted hover:text-ink md:hidden" 
-                onClick={() => setMenuOpen(false)}
+                onClick={() => setMenuOpen(false)} 
               >
                 ✕
               </button>
@@ -131,10 +110,20 @@ export function ScoutApp() {
 
           <div className="border-t border-line/60 pt-4 flex flex-col gap-2">
             <button
-              onClick={handleCikis}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-semibold text-muted hover:bg-clay/10 hover:text-clay transition-colors"
+              onClick={() => {
+                setSettingsOpen(true);
+                setMenuOpen(false);
+              }}
+              className="flex w-full items-center justify-between rounded-xl border border-line bg-cream px-3 py-2 text-left text-xs font-semibold text-ink hover:border-pine transition-colors"
             >
-              <span>🚪</span>
+              <span>Ayarlar</span>
+              <span className="text-[10px] text-muted">v1.0</span>
+            </button>
+
+            <button
+              onClick={handleCikis}
+              className="flex w-full items-center rounded-xl px-3 py-2 text-left text-xs font-semibold text-muted hover:bg-clay/10 hover:text-clay transition-colors"
+            >
               <span>Çıkış Yap</span>
             </button>
           </div>
@@ -146,6 +135,11 @@ export function ScoutApp() {
           </div>
         </main>
       </div>
+
+      <SettingsModal 
+        acik={settingsOpen} 
+        kapat={() => setSettingsOpen(false)} 
+      />
     </div>
   );
 }
