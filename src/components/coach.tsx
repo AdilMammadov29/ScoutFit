@@ -34,7 +34,7 @@ export function CoachView() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [dinleniyor, setDinleniyor] = useState(false);
   const [kopyalananId, setKopyalananId] = useState<string | null>(null);
-  
+
   const recognitionRef = useRef<any>(null);
   const mesajSonuRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +102,12 @@ export function CoachView() {
       zaman: simdikiZaman,
     };
 
+    // Modelin önceki konuşmayı hatırlaması için son mesajları geçmiş olarak hazırla
+    const apiGecmis = mesajlar.slice(-6).map((m) => ({
+      role: m.gonderen === "kullanici" ? ("user" as const) : ("assistant" as const),
+      content: m.metin,
+    }));
+
     setMesajlar((onceki) => [...onceki, yeniKullaniciMesaji]);
     setSoru("");
     setYukleniyor(true);
@@ -113,7 +119,14 @@ export function CoachView() {
         : "";
 
     try {
-      const res = await kocSor({ data: { soru: s, baglam } });
+      const res = await kocSor({
+        data: {
+          soru: s,
+          baglam,
+          gecmis: apiGecmis,
+        },
+      });
+
       if (res.ok && res.metin) {
         const koctanGelen: Mesaj = {
           id: (Date.now() + 1).toString(),
