@@ -1,3 +1,5 @@
+import { Capacitor, CapacitorHttp } from "@capacitor/core";
+
 export type BesinOgesi = {
   ad: string;
   porsiyon?: string;
@@ -59,56 +61,151 @@ export async function yemekHesapla(girdiParam: YemekGirdi): Promise<YemekAnalizS
     typeof girdiParam === "string"
       ? girdiParam
       : (girdiParam as { data?: { metin?: string } })?.data?.metin ?? "";
-      
+
   const girdi = metin.trim();
   if (!girdi) return { ok: false, hata: "Metin boş olamaz." };
 
-  const apiKey =
+  const rawKey =
     import.meta.env.VITE_GROQ_API_KEY ||
-    (typeof process !== "undefined" ? process.env?.VITE_GROQ_API_KEY : "") ||
-    "";
+    "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";
+
+  const apiKey = String(rawKey).trim();
 
   if (!apiKey) {
-    console.error("Groq API anahtarı bulunamadı.");
-    return { ok: false, hata: "api_key_eksik" };
+    return {
+      ok: true,
+      ogeler: [
+        {
+          ad: "Hata: Groq API anahtarı bulunamadı.",
+          kalori: 0,
+          kcal: 0,
+          protein: 0,
+          karb: 0,
+          yag: 0,
+        },
+      ],
+      toplamKalori: 0,
+    };
   }
 
-  try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(25000),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${String(apiKey).trim()}`,
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
-        temperature: 0.1,
-        max_tokens: 1200,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SISTEM_ISTEMI },
-          { role: "user", content: `Öğünü analiz et: ${girdi}` },
-        ],
-      }),
-    });
+  const payload = {
+    model: "openai/gpt-oss-120b",
+    temperature: 0.1,
+    max_tokens: 1200,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: SISTEM_ISTEMI },
+      { role: "user", content: `Öğünü analiz et: ${girdi}` },
+    ],
+  };
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error("API Hatası (" + res.status + "):", errBody);
-      return { ok: false, hata: `http-${res.status}` };
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  try {
+    let body: any;
+
+    if (Capacitor.isNativePlatform()) {
+      const res = await CapacitorHttp.post({
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        headers,
+        data: payload,
+        connectTimeout: 30000,
+        readTimeout: 30000,
+      });
+
+      if (res.status !== 200) {
+        const errDetail =
+          typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+        return {
+          ok: true,
+          ogeler: [
+            {
+              ad: `API Hatası (${res.status}): ${errDetail}`,
+              kalori: 0,
+              kcal: 0,
+              protein: 0,
+              karb: 0,
+              yag: 0,
+            },
+          ],
+          toplamKalori: 0,
+        };
+      }
+      body = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+    } else {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        return {
+          ok: true,
+          ogeler: [
+            {
+              ad: `Web API Hatası (${res.status}): ${errBody}`,
+              kalori: 0,
+              kcal: 0,
+              protein: 0,
+              karb: 0,
+              yag: 0,
+            },
+          ],
+          toplamKalori: 0,
+        };
+      }
+      body = await res.json();
     }
 
-    const body = await res.json();
     let rawContent = body.choices?.[0]?.message?.content?.trim() ?? "";
+
+    if (!rawContent) {
+      return {
+        ok: true,
+        ogeler: [
+          {
+            ad: "Hata: Groq modelinden boş içerik döndü.",
+            kalori: 0,
+            kcal: 0,
+            protein: 0,
+            karb: 0,
+            yag: 0,
+          },
+        ],
+        toplamKalori: 0,
+      };
+    }
 
     if (rawContent.startsWith("```")) {
       rawContent = rawContent.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
     }
 
-    const parsed = JSON.parse(rawContent);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch {
+      return {
+        ok: true,
+        ogeler: [
+          {
+            ad: `JSON Ayrıştırma Hatası: ${rawContent.slice(0, 120)}`,
+            kalori: 0,
+            kcal: 0,
+            protein: 0,
+            karb: 0,
+            yag: 0,
+          },
+        ],
+        toplamKalori: 0,
+      };
+    }
 
-    const hamOgeler = Array.isArray(parsed.ogeler) ? parsed.ogeler : [];
+    const hamOgeler = Array.isArray(parsed?.ogeler) ? parsed.ogeler : [];
     const ogeler: BesinOgesi[] = hamOgeler.map((o: any) => {
       const cal = Math.round(Number(o.kalori ?? o.kcal) || 0);
       return {
@@ -124,14 +221,26 @@ export async function yemekHesapla(girdiParam: YemekGirdi): Promise<YemekAnalizS
 
     const hesaplananToplam = ogeler.reduce((acc, cur) => acc + cur.kalori, 0);
     const toplamKalori =
-      typeof parsed.toplamKalori === "number" && !isNaN(parsed.toplamKalori)
+      typeof parsed?.toplamKalori === "number" && !isNaN(parsed.toplamKalori)
         ? Math.round(parsed.toplamKalori)
         : hesaplananToplam;
 
     return { ok: true, ogeler, toplamKalori };
-  } catch (err) {
-    console.error("Yemek analiz hatası:", err);
-    return { ok: false, hata: "analiz_hatasi" };
+  } catch (err: any) {
+    return {
+      ok: true,
+      ogeler: [
+        {
+          ad: `Bağlantı Hatası: ${err?.message || String(err)}`,
+          kalori: 0,
+          kcal: 0,
+          protein: 0,
+          karb: 0,
+          yag: 0,
+        },
+      ],
+      toplamKalori: 0,
+    };
   }
 }
 

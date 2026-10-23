@@ -1,16 +1,76 @@
+import { useEffect } from "react";
+import * as PedometerPlugin from "@capgo/capacitor-pedometer";
+const Pedometer: any = (PedometerPlugin as any).Pedometer || (PedometerPlugin as any).default || PedometerPlugin;
 import { useActivity } from "@/lib/activityStore";
 import { useNotifications } from "@/lib/notificationStore";
 import { DietStreakCard } from "./dietStreakCard";
 import type { Section } from "@/components/shell";
 
 export function TodayView({ git }: { git: (s: Section) => void }) {
-  const { bugunSuMl, hedefSuMl, suEkle, suSifirla, istatistikleriGetir } = useActivity();
-  const { bildirimler, panelAcik, paneliAcKapat, okunduOlarakIsaretle } = useNotifications();
+  const {
+    bugunSuMl,
+    hedefSuMl,
+    suEkle,
+    suSifirla,
+    adimEkle,
+    adimSifirla,
+    istatistikleriGetir,
+  } = useActivity();
+  const { bildirimler, panelAcik, paneliAcKapat, okunduOlarakIsaretle } =
+    useNotifications();
   const okunmamisSayisi = bildirimler.filter((b) => !b.okundu).length;
 
   const istatistik = istatistikleriGetir();
   const suYuzdesi = Math.min(100, Math.round((bugunSuMl / hedefSuMl) * 100));
   const maxAdim = Math.max(...istatistik.haftalikGunler.map((g) => g.adim), 10000);
+
+  // Telefonun adım sensörünü otomatik dinle
+  useEffect(() => {
+    let dinleyiciId: any = null;
+
+    async function baslat() {
+      try {
+        const pedo = Pedometer as any;
+        if (!pedo) return;
+
+        if (typeof pedo.checkPermissions === "function") {
+          const check = await pedo.checkPermissions();
+          if (
+            check?.activityRecognition !== "granted" &&
+            typeof pedo.requestPermissions === "function"
+          ) {
+            await pedo.requestPermissions();
+          }
+        }
+
+        // Sensörü dinlemeye al
+        if (typeof pedo.startPedometerUpdates === "function") {
+          dinleyiciId = await pedo.startPedometerUpdates({
+            update: (data: any) => {
+              if (data?.numberOfSteps && data.numberOfSteps > 0) {
+                adimEkle(Number(data.numberOfSteps));
+              }
+            },
+          });
+        }
+      } catch (err) {
+        console.log("Adım sensörü başlatılamadı:", err);
+      }
+    }
+
+    baslat();
+
+    return () => {
+      try {
+        const pedo = Pedometer as any;
+        if (dinleyiciId && typeof pedo?.stopPedometerUpdates === "function") {
+          pedo.stopPedometerUpdates().catch(() => {});
+        }
+      } catch {
+        // cleanup sessizce geçsin
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-6 pb-12">
@@ -111,7 +171,7 @@ export function TodayView({ git }: { git: (s: Section) => void }) {
           </div>
         </div>
 
-        {/* Ekleme Butonları */}
+        {/* Su Ekleme Butonları */}
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -130,13 +190,22 @@ export function TodayView({ git }: { git: (s: Section) => void }) {
         </div>
       </div>
 
-      {/* Adım ve Mesafe İstatistikleri (Günlük, Haftalık, Aylık) */}
+      {/* Adım ve Mesafe İstatistikleri */}
       <div className="rounded-2xl border border-line bg-paper p-5">
-        <div className="border-b border-line pb-3">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-muted">
-            Aktivite Hacmi
-          </span>
-          <h3 className="font-display text-lg font-bold text-ink">Adım ve Mesafe</h3>
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <div>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-muted">
+              Aktivite Hacmi
+            </span>
+            <h3 className="font-display text-lg font-bold text-ink">Adım ve Mesafe</h3>
+          </div>
+          <button
+            type="button"
+            onClick={adimSifirla}
+            className="text-[11px] font-mono text-muted hover:text-clay"
+          >
+            Sıfırla
+          </button>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -165,6 +234,31 @@ export function TodayView({ git }: { git: (s: Section) => void }) {
           </div>
         </div>
 
+        {/* Manuel Test & Ekleme Butonları */}
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => adimEkle(500)}
+            className="rounded-xl border border-line bg-cream/40 py-2 text-xs font-bold text-ink transition-all hover:bg-cream active:scale-95"
+          >
+            +500 Adım
+          </button>
+          <button
+            type="button"
+            onClick={() => adimEkle(1000)}
+            className="rounded-xl border border-line bg-cream/40 py-2 text-xs font-bold text-ink transition-all hover:bg-cream active:scale-95"
+          >
+            +1.000 Adım
+          </button>
+          <button
+            type="button"
+            onClick={() => adimEkle(5000)}
+            className="rounded-xl border border-line bg-cream/40 py-2 text-xs font-bold text-ink transition-all hover:bg-cream active:scale-95"
+          >
+            +5.000 Adım
+          </button>
+        </div>
+
         {/* Haftalık Mini Bar Grafiği */}
         <div className="mt-5 border-t border-line/60 pt-4">
           <span className="text-[10px] font-mono uppercase tracking-wider text-muted">
@@ -178,7 +272,7 @@ export function TodayView({ git }: { git: (s: Section) => void }) {
                   <div className="flex h-12 w-full items-end justify-center rounded-sm bg-cream">
                     <div
                       className="w-full rounded-sm bg-pine transition-all"
-                      style={{ height: `${Math.max(15, yukseklik)}%` }}
+                      style={{ height: `${Math.max(8, yukseklik)}%` }}
                     />
                   </div>
                   <span className="text-[10px] font-mono text-muted">{g.gun}</span>
