@@ -70,17 +70,22 @@ export function ScoutApp() {
         </div>
       </main>
 
-      {/* Yüzen AI Koç Butonu (Floating Action Button) */}
-      <div className="fixed bottom-16 right-4 z-40 sm:bottom-20 sm:right-8">
-        <button
-          type="button"
-          onClick={() => setCoachOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-pine px-4 py-3 text-cream shadow-lg hover:opacity-95 transition-all active:scale-95"
-        >
-          <span className="text-lg"></span>
-          <span className="text-xs font-bold hidden sm:inline">AI Koç</span>
-        </button>
-      </div>
+     {/* Yüzen AI Koç Butonu (Floating Action Button) */}
+        <div className="fixed bottom-16 right-4 z-40 sm:bottom-20 sm:right-8">
+          <button
+            type="button"
+            onClick={() => setCoachOpen(true)}
+            className="flex items-center gap-2 rounded-full bg-pine px-3.5 py-2.5 text-cream shadow-xl hover:opacity-95 transition-all active:scale-95 border border-white/10 backdrop-blur-sm"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+            </span>
+            <span className="text-[11px] font-bold tracking-wider font-mono uppercase text-emerald-300">
+              AI KOÇ
+            </span>
+          </button>
+        </div>
 
       {/* AI Koç Modalı (Tam Ekran Kart) */}
       {coachOpen && (

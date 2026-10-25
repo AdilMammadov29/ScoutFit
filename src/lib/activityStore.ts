@@ -1,5 +1,5 @@
 import { create } from "zustand";
-
+import { adimTakibiniBaslat } from "./pedometer";
 export interface GunlukAktivite {
   tarih: string;
   adim: number;
@@ -135,8 +135,18 @@ export const useActivity = create<ActivityState>((set, get) => {
           { gun: "Cum", adim: bugunAdim },
           { gun: "Cmt", adim: 0 },
           { gun: "Paz", adim: 0 },
+          
         ],
       };
     },
+    
   };
+});
+// Cihaz adım sensörünü dinler ve bugunAdim değerini günceller
+// Cihaz adım sensörünü dinler ve bugunAdim değerini günceller
+adimTakibiniBaslat((gelenAdim: number) => {
+  const store = useActivity.getState();
+  if (gelenAdim > store.bugunAdim) {
+    store.adimGuncelle(gelenAdim);
+  }
 });
