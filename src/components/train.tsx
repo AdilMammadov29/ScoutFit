@@ -102,7 +102,7 @@ export function TrainView() {
         .join("\n");
 
       if (toplamHacimKg > 0) {
-        kaydedilecekHareketler += `\n\n⚡ Toplam Antrenman Hacmi: ${toplamHacimKg.toLocaleString()} kg`;
+        kaydedilecekHareketler += `\n\n Toplam Antrenman Hacmi: ${toplamHacimKg.toLocaleString()} kg`;
       }
     } else {
       if (!hareketler.trim()) {

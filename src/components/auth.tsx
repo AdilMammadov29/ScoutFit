@@ -158,7 +158,7 @@ export function AuthView() {
               className="flex items-center gap-2 rounded-2xl bg-[#10b981] px-8 py-4 text-xs font-black uppercase tracking-wider text-black shadow-2xl shadow-[#10b981]/40 transition hover:bg-[#34d399] hover:scale-105 active:scale-95"
             >
               <span>Ücretsiz Profilini Aç</span>
-              <span>⚡</span>
+              <span></span>
             </button>
             <button
               onClick={() => { setModalMod("giris"); setHata(""); setBasari(""); }}
@@ -209,7 +209,7 @@ export function AuthView() {
                       : "text-zinc-400 hover:text-white"
                   }`}
                 >
-                  🔥 Yağ Yakımı (Defisit)
+                   Yağ Yakımı (Defisit)
                 </button>
               </div>
 
@@ -324,7 +324,7 @@ export function AuthView() {
               <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#10b981]/20 text-xl">
-                    ⚡
+                    
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white">Bugünkü Program: Göğüs & Arka Kol</h3>
@@ -332,7 +332,7 @@ export function AuthView() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-bold text-[#10b981]">7 GÜNLÜK SERİ 🔥</div>
+                  <div className="text-xs font-bold text-[#10b981]">7 GÜNLÜK SERİ </div>
                   <div className="text-[11px] text-zinc-400">Disiplin puanı: %100</div>
                 </div>
               </div>

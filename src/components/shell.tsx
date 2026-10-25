@@ -14,10 +14,10 @@ import { bulutuDurdur } from "@/lib/sync";
 export type Section = "today" | "train" | "meals" | "profile" | "goal";
 
 const NAV: { id: "today" | "train" | "meals" | "profile"; no: string; ad: string; icon: string }[] = [
-  { id: "today", no: "01", ad: "Bugün", icon: "⚡" },
-  { id: "train", no: "02", ad: "Antrenman & GPS", icon: "🔥" },
-  { id: "meals", no: "03", ad: "Beslenme", icon: "🥗" },
-  { id: "profile", no: "04", ad: "Profil & Hedef", icon: "👤" },
+ { id: "today", no: "01", ad: "Bugün", icon: "•" },
+{ id: "train", no: "02", ad: "Antrenman & GPS", icon: "•" },
+{ id: "meals", no: "03", ad: "Beslenme", icon: "•" },
+{ id: "profile", no: "04", ad: "Profil & Hedef", icon: "•" },
 ];
 
 export function ScoutApp() {
@@ -77,7 +77,7 @@ export function ScoutApp() {
           onClick={() => setCoachOpen(true)}
           className="flex items-center gap-2 rounded-full bg-pine px-4 py-3 text-cream shadow-lg hover:opacity-95 transition-all active:scale-95"
         >
-          <span className="text-lg">🤖</span>
+          <span className="text-lg"></span>
           <span className="text-xs font-bold hidden sm:inline">AI Koç</span>
         </button>
       </div>
@@ -88,7 +88,7 @@ export function ScoutApp() {
           <div className="relative flex h-full max-h-[640px] w-full max-w-2xl flex-col rounded-3xl border border-line bg-paper shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-5 py-3.5 bg-cream/30">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🤖</span>
+                <span className="text-xl"></span>
                 <div>
                   <h3 className="font-display text-base font-bold text-ink leading-tight">
                     Scout AI Koç

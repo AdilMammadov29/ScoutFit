@@ -39,7 +39,7 @@ export function DietStreakCard() {
       id: "temiz",
       baslik: "Plana Sadık",
       aciklama: "Kalori & makro korundu",
-      emoji: "🥗",
+      emoji: "Diyet",
     },
     {
       id: "dengeli",
@@ -67,7 +67,7 @@ export function DietStreakCard() {
           </div>
 
           <div className="flex items-center gap-1.5 rounded-full bg-cream px-3 py-1 text-ink">
-            <span className="text-sm">🔥</span>
+            <span className="text-sm"></span>
             <span className="font-mono text-sm font-bold tabular-nums">{seri}</span>
             <span className="text-[11px] text-muted">gün seri</span>
           </div>

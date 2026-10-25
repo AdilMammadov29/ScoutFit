@@ -325,7 +325,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
       <div className="rounded-2xl border border-pine/30 bg-pine/5 p-4 sm:p-5">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span>✨</span>
+            <span>AI</span>
             <h3 className="font-display text-sm font-bold text-ink">
               Yapay Zeka ile Otomatik Ekle
             </h3>
@@ -361,7 +361,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
             disabled={aiYukleniyor || !aiGirdi.trim()}
             className="rounded-xl bg-pine px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50 active:scale-95"
           >
-            {aiYukleniyor ? "Hesaplanıyor..." : "Analiz Et & Ekle 🥗"}
+            {aiYukleniyor ? "Hesaplanıyor..." : "Analiz Et & Ekle "}
           </button>
         </div>
 
