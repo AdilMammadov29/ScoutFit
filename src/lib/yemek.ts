@@ -14,21 +14,23 @@ export async function yemekAnalizEt(metin: string): Promise<YemekAnalizSonuc> {
     return { ad: "Bilinmeyen Öğün", kalori: 0, protein: 0, karbonhidrat: 0, yag: 0 };
   }
 
-  const apiKey = "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";
+  const apiKey = "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";
   const url = "https://api.groq.com/openai/v1/chat/completions";
 
-  const prompt = `Besin: "${s}"
-Porsiyona göre toplam kalori ve makroları hesapla.
-SADECE JSON üret:
-{"ad": "${s}", "kalori": 330, "protein": 62, "karbonhidrat": 0, "yag": 7}`;
+  const sistemPrompt = `Sen profesyonel bir diyetisyen ve besin analiz motorusun.
+Görevin: Kullanıcının girdiği besini ve gramajını analiz edip net kalori ve makroları (protein, karbonhidrat, yağ) hesaplamak.
+Eğer gramaj verilmemişse standart 1 porsiyon üzerinden hesapla.
+ÇIKTI KURALI:
+Sadece ve sadece geçerli bir JSON objesi döndür. Kesinlikle markdown (\`\`\`json), selamlama veya açıklama yazma.
+Alanlar: "ad" (string), "kalori" (tam sayı kcal), "protein" (tam sayı gram), "karbonhidrat" (tam sayı gram), "yag" (tam sayı gram).`;
 
   const payload = {
     model: "openai/gpt-oss-120b",
     temperature: 0.1,
-    max_tokens: 400,
+    max_tokens: 300,
     messages: [
-      { role: "system", content: "Sen bir besin analiz motorusun. Yalnızca saf JSON çıktısı üretirsin." },
-      { role: "user", content: prompt },
+      { role: "system", content: sistemPrompt },
+      { role: "user", content: `Aşağıdaki besinin besin değerlerini hesapla:\n${s}` },
     ],
   };
 
@@ -84,7 +86,6 @@ SADECE JSON üret:
     console.error("Yemek analiz hatası:", err);
   }
 
-  // Model cevabı parse edilemezse 0 basarak durumun görülmesini sağlar
   return {
     ad: s,
     kalori: 0,
