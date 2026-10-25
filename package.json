@@ -10,6 +10,7 @@
     "build:apk": "npm run build && npx cap sync android && cd android && .\\gradlew.bat assembleDebug && cd .."
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^8.2.1",
     "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
@@ -20,6 +21,7 @@
     "@supabase/supabase-js": "^2.118.0",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
+    "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "react": "latest",
     "react-dom": "latest",

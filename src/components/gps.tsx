@@ -5,6 +5,7 @@ import L from "leaflet";
 import { useFit } from "@/lib/store";
 import { useSettingsStore } from "@/lib/settingsStore";
 import { triggerHaptic, speakFeedback } from "@/lib/feedback";
+import { Geolocation } from "@capacitor/geolocation";
 
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
@@ -54,7 +55,6 @@ export function GpsTracker() {
 
   const sonKilometreRef = useRef<number>(0);
 
-  // Sayfa yenilendiğinde verilerin silinmemesi için localStorage başlangıcı
   const [aktiviteler, setAktiviteler] = useState<any[]>(() => {
     try {
       const kayitli = localStorage.getItem("scoutfit_gps_aktiviteler");
@@ -66,7 +66,7 @@ export function GpsTracker() {
 
   const [hata, setHata] = useState<string | null>(null);
 
-  const watchIdRef = useRef<number | null>(null);
+  const watchIdRef = useRef<string | null>(null);
   const timerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -75,13 +75,13 @@ export function GpsTracker() {
     } catch {}
   }, [aktiviteler]);
 
+  // Sayfa açıldığında bir kere konum al
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setSimdikiKonum([pos.coords.latitude, pos.coords.longitude]),
-        () => {}
-      );
-    }
+    Geolocation.getCurrentPosition({ enableHighAccuracy: true })
+      .then((pos) => {
+        setSimdikiKonum([pos.coords.latitude, pos.coords.longitude]);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -98,60 +98,84 @@ export function GpsTracker() {
   const hesaplananAdim = Math.round(mesafe * 1350);
   const harcananKalori = Math.round(mesafe * 65);
 
-  const antrenmaniBaslat = () => {
+  const antrenmaniBaslat = async () => {
     setHata(null);
-    if (!navigator.geolocation) {
-      return setHata("Cihazınız veya tarayıcınız GPS servisini desteklemiyor.");
-    }
 
-    triggerHaptic("start");
-    speakFeedback("Antrenman başladı.");
+    try {
+      // Önce izin iste
+      const perm = await Geolocation.requestPermissions();
+      if (perm.location !== "granted" && perm.coarseLocation !== "granted") {
+        setHata("Konum izni verilmedi. Ayarlardan konum iznini açın.");
+        return;
+      }
 
-    setAktif(true);
-    setSure(0);
-    setMesafe(0);
-    setRota([]);
-    sonKilometreRef.current = 0;
+      triggerHaptic("start");
+      speakFeedback("Antrenman başladı.");
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, speed } = position.coords;
-        const yeniNokta: [number, number] = [latitude, longitude];
+      setAktif(true);
+      setSure(0);
+      setMesafe(0);
+      setRota([]);
+      sonKilometreRef.current = 0;
 
-        setSimdikiKonum(yeniNokta);
-        setHiz(speed !== null && speed >= 0 ? Number((speed * 3.6).toFixed(1)) : 0);
-
-        setRota((onceki) => {
-          if (onceki.length > 0) {
-            const [sonLat, sonLng] = onceki[onceki.length - 1];
-            const ekMesafe = mesafeHesapla(sonLat, sonLng, latitude, longitude);
-            if (ekMesafe < 0.5) {
-              setMesafe((m) => {
-                const yeniMesafe = Number((m + ekMesafe).toFixed(3));
-                
-                // Her tam kilometrede bir ses ve titreşim uyarısı
-                const suAnkiKm = Math.floor(yeniMesafe);
-                if (suAnkiKm > sonKilometreRef.current) {
-                  sonKilometreRef.current = suAnkiKm;
-                  triggerHaptic("milestone");
-                  speakFeedback(`${suAnkiKm} kilometre tamamlandı.`);
-                }
-
-                return yeniMesafe;
-              });
-            }
+      // Capacitor Geolocation ile izlemeye başla
+      const id = await Geolocation.watchPosition(
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 3000,
+        },
+        (position, err) => {
+          if (err) {
+            setHata("Konum alınamadı: " + (err.message || String(err)));
+            return;
           }
-          return [...onceki, yeniNokta];
-        });
-      },
-      (err) => setHata("Konum alınamadı: " + err.message),
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
-    );
+          if (!position) return;
+
+          const { latitude, longitude, speed } = position.coords;
+          const yeniNokta: [number, number] = [latitude, longitude];
+
+          setSimdikiKonum(yeniNokta);
+          setHiz(speed !== null && speed >= 0 ? Number((speed * 3.6).toFixed(1)) : 0);
+
+          setRota((onceki) => {
+            if (onceki.length > 0) {
+              const [sonLat, sonLng] = onceki[onceki.length - 1];
+              const ekMesafe = mesafeHesapla(sonLat, sonLng, latitude, longitude);
+              if (ekMesafe < 0.5) {
+                setMesafe((m) => {
+                  const yeniMesafe = Number((m + ekMesafe).toFixed(3));
+
+                  // Her tam kilometrede ses + titreşim
+                  const suAnkiKm = Math.floor(yeniMesafe);
+                  if (suAnkiKm > sonKilometreRef.current) {
+                    sonKilometreRef.current = suAnkiKm;
+                    triggerHaptic("milestone");
+                    speakFeedback(`${suAnkiKm} kilometre tamamlandı.`);
+                  }
+
+                  return yeniMesafe;
+                });
+              }
+            }
+            return [...onceki, yeniNokta];
+          });
+        }
+      );
+
+      watchIdRef.current = id;
+    } catch (e: any) {
+      console.error(e);
+      setHata("GPS başlatılamadı: " + (e?.message || String(e)));
+      setAktif(false);
+    }
   };
 
-  const antrenmaniBitir = () => {
+  const antrenmaniBitir = async () => {
     if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
+      try {
+        await Geolocation.clearWatch({ id: watchIdRef.current });
+      } catch {}
       watchIdRef.current = null;
     }
     setAktif(false);
@@ -167,12 +191,12 @@ export function GpsTracker() {
         mesafe,
         adim: hesaplananAdim,
         kalori: harcananKalori,
-        ortalamaHiz: sure > 0 ? (mesafe / (sure / 3600)).toFixed(1) : 0,
+        ortalamaHiz: sure > 0 ? (mesafe / (sure / 3600)).toFixed(1) : "0",
       };
 
       setAktiviteler((prev) => [yeniAktivite, ...prev]);
 
-      // Çevrimdışı koruma: Ayar açıksa yerel senkronizasyon kuyruğuna da ekle
+      // Çevrimdışı koruma
       if (settings.offlineSync) {
         try {
           const offlineQueue = JSON.parse(localStorage.getItem("scoutfit_offline_queue") || "[]");
@@ -196,23 +220,36 @@ export function GpsTracker() {
     const sa = Math.floor(saniye / 3600);
     const dk = Math.floor((saniye % 3600) / 60);
     const sn = saniye % 60;
-    return sa > 0 ? `${sa}:${dk < 10 ? "0" : ""}${dk}:${sn < 10 ? "0" : ""}${sn}` : `${dk}:${sn < 10 ? "0" : ""}${sn}`;
+    return sa > 0
+      ? `${sa}:${dk < 10 ? "0" : ""}${dk}:${sn < 10 ? "0" : ""}${sn}`
+      : `${dk}:${sn < 10 ? "0" : ""}${sn}`;
   };
 
   return (
     <div className="mx-auto max-w-4xl p-6 text-white space-y-6">
       <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-extrabold tracking-tight text-[#6f9f87]">GPS Rota & Adım Takibi</h2>
-        <p className="text-sm text-gray-400">Başlat düğmesine bas, rotan haritada çizilsin; mesafen ve adımların hesaplansın.</p>
+        <h2 className="text-3xl font-extrabold tracking-tight text-[#6f9f87]">
+          GPS Rota & Adım Takibi
+        </h2>
+        <p className="text-sm text-gray-400">
+          Başlat düğmesine bas, rotan haritada çizilsin; mesafen ve adımların hesaplansın.
+        </p>
       </div>
 
       {hata && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">{hata}</div>
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+          {hata}
+        </div>
       )}
 
-      {/* HARİTA GÖRÜNÜMÜ */}
+      {/* HARİTA */}
       <div className="h-[380px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl relative z-0">
-        <MapContainer center={simdikiKonum} zoom={17} scrollWheelZoom={true} style={{ height: "100%", width: "100%" }}>
+        <MapContainer
+          center={simdikiKonum}
+          zoom={17}
+          scrollWheelZoom={true}
+          style={{ height: "100%", width: "100%" }}
+        >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -221,27 +258,32 @@ export function GpsTracker() {
           <Marker position={simdikiKonum}>
             <Popup>Anlık Konumun 🚀</Popup>
           </Marker>
-          
-          {/* Canlı Rota Çizgisi: Kullanıcı ayarına bağlı render */}
+
           {settings.livePolyline && rota.length > 1 && (
             <Polyline positions={rota} color="#6f9f87" weight={5} />
           )}
         </MapContainer>
       </div>
 
-      {/* İSTATİSTİK KARTLARI */}
+      {/* İSTATİSTİKLER */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
           <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Mesafe</span>
-          <div className="text-3xl font-black text-[#6f9f87]">{mesafe.toFixed(2)} <span className="text-sm font-normal text-gray-300">km</span></div>
+          <div className="text-3xl font-black text-[#6f9f87]">
+            {mesafe.toFixed(2)} <span className="text-sm font-normal text-gray-300">km</span>
+          </div>
         </div>
         <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
           <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Adım Sayısı</span>
-          <div className="text-3xl font-black text-white">{hesaplananAdim} <span className="text-sm font-normal text-gray-300">adım</span></div>
+          <div className="text-3xl font-black text-white">
+            {hesaplananAdim} <span className="text-sm font-normal text-gray-300">adım</span>
+          </div>
         </div>
         <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
           <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Yakılan Kalori</span>
-          <div className="text-3xl font-black text-[#b39573]">{harcananKalori} <span className="text-sm font-normal text-gray-300">kcal</span></div>
+          <div className="text-3xl font-black text-[#b39573]">
+            {harcananKalori} <span className="text-sm font-normal text-gray-300">kcal</span>
+          </div>
         </div>
         <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
           <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Süre</span>
@@ -249,7 +291,7 @@ export function GpsTracker() {
         </div>
       </div>
 
-      {/* KONTROL BUTONLARI */}
+      {/* BUTONLAR */}
       <div className="flex justify-center gap-4 pt-2">
         {!aktif ? (
           <button
@@ -268,20 +310,27 @@ export function GpsTracker() {
         )}
       </div>
 
-      {/* GEÇMİŞ LİSTESİ */}
+      {/* GEÇMİŞ */}
       {aktiviteler.length > 0 && (
         <div className="mt-8 space-y-4">
           <h3 className="text-xl font-bold text-white">Geçmiş Antrenmanlar</h3>
           <div className="space-y-3">
             {aktiviteler.map((a) => (
-              <div key={a.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 shadow-md">
+              <div
+                key={a.id}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 shadow-md"
+              >
                 <div>
                   <span className="text-xs font-semibold text-[#6f9f87]">{a.tarih}</span>
-                  <div className="text-lg font-bold text-white mt-0.5">{a.mesafe} km · {sureyiFormatla(a.sure)} · {a.adim} adım</div>
+                  <div className="text-lg font-bold text-white mt-0.5">
+                    {a.mesafe} km · {sureyiFormatla(a.sure)} · {a.adim} adım
+                  </div>
                 </div>
                 <div className="text-right">
                   <span className="text-xs text-gray-400">Kalori / Hız</span>
-                  <div className="text-sm font-semibold text-[#b39573]">{a.kalori} kcal · {a.ortalamaHiz} km/s</div>
+                  <div className="text-sm font-semibold text-[#b39573]">
+                    {a.kalori} kcal · {a.ortalamaHiz} km/s
+                  </div>
                 </div>
               </div>
             ))}

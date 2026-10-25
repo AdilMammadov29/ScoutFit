@@ -8,46 +8,56 @@ export function yerelKoc(soru: string, kalori: number): string {
   return `${kalori} kcal hedefini bozmadan sorunu antrenman ya da öğün olarak netleştirirsen daha kısa cevap veririm. Neyi değiştirmek istiyorsun?`;
 }
 
-export type ChatMesaji = {
+export interface ChatMesaji {
   role: "system" | "user" | "assistant";
   content: string;
-};
+}
 
-type KocGirdi = {
+export interface KocGirdi {
   soru: string;
   baglam?: string;
   gecmis?: ChatMesaji[];
-};
+}
 
-export async function kocSor({ data }: { data: KocGirdi }) {
-  const soru = String(data?.soru ?? "").trim().slice(0, 600);
-  const baglam = String(data?.baglam ?? "").trim().slice(0, 500);
+export async function kocSor({ data }: { data: KocGirdi }): Promise<{ ok: boolean; metin?: string; hata?: string }> {
+  const soru = String(data?.soru ?? "").trim();
+  const baglam = String(data?.baglam ?? "").trim();
 
-  if (!soru) return { ok: false as const, hata: "bos" };
+  if (!soru) return { ok: false, hata: "Soru boş bırakılamaz." };
 
-  // Anahtar doğrudan sabitlendi (.env hatasını önler)
   const apiKey = "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";
+  const url = "https://api.groq.com/openai/v1/chat/completions";
 
   const sistemIcerik = `Sen ScoutFit profesyonel fitness koçusun.
-Kullanıcı Profili: ${baglam || "belirtilmedi"}.
+Kullanıcı Durumu: ${baglam || "Belirtilmedi"}.
 
-KESİN KURALLAR:
-1. Asla her cümlene "Merhaba", "Selam", "Hoş geldin" gibi kalıplarla BAŞLAMA. Sohbet zaten akıyor, doğrudan soruya net ve samimi cevap ver.
+KURALLAR:
+1. Selamlama kalıpları (Merhaba, Selam) kullanma, doğrudan soruya cevap ver.
 2. Kesinlikle EMOJİ KULLANMA.
-3. Konuşma geçmişini takip et, kullanıcının daha önce söylediği şeyleri hatırla.
-4. Yanıtların sade, somut ve Türkçe olsun. Gereksiz dolandırma.`;
+3. Sade, motive edici ve Türkçe yanıt ver.`;
 
-  const gonderilecekMesajlar: ChatMesaji[] = [
+  const temizMesajlar: { role: "system" | "user" | "assistant"; content: string }[] = [
     { role: "system", content: sistemIcerik },
-    ...(data.gecmis || []),
-    { role: "user", content: soru },
   ];
 
+  if (Array.isArray(data?.gecmis)) {
+    for (const m of data.gecmis) {
+      if (m && typeof m.content === "string" && m.content.trim().length > 0) {
+        if (m.role === "user" || m.role === "assistant") {
+          temizMesajlar.push({ role: m.role, content: m.content.trim() });
+        }
+      }
+    }
+  }
+
+  temizMesajlar.push({ role: "user", content: soru });
+
+  // Groq'un güncel ve aktif üretim modeli
   const payload = {
     model: "openai/gpt-oss-120b",
     temperature: 0.5,
-    max_tokens: 700,
-    messages: gonderilecekMesajlar,
+    max_tokens: 600,
+    messages: temizMesajlar,
   };
 
   const headers = {
@@ -56,46 +66,46 @@ KESİN KURALLAR:
   };
 
   try {
-    let responseData: any;
+    let rawText = "";
 
     if (Capacitor.isNativePlatform()) {
       const res = await CapacitorHttp.post({
-        url: "https://api.groq.com/openai/v1/chat/completions",
+        url,
         headers,
         data: payload,
-        connectTimeout: 30000,
-        readTimeout: 30000,
+        connectTimeout: 20000,
+        readTimeout: 20000,
       });
 
       if (res.status !== 200) {
-        return {
-          ok: true as const,
-          metin: `API Hatası (${res.status}): ${JSON.stringify(res.data)}`,
-        };
+        const errDetail = typeof res.data === "object" ? JSON.stringify(res.data) : String(res.data);
+        return { ok: false, hata: `Groq Hatası (${res.status}): ${errDetail.slice(0, 150)}` };
       }
-      responseData = res.data;
+
+      const d = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
+      rawText = d?.choices?.[0]?.message?.content?.trim() || "";
     } else {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        return { ok: true as const, metin: `API Hatası (${res.status}): ${errText}` };
+        const errDetail = await res.text();
+        return { ok: false, hata: `Web Hatası (${res.status}): ${errDetail.slice(0, 150)}` };
       }
-      responseData = await res.json();
+
+      const d = await res.json();
+      rawText = d?.choices?.[0]?.message?.content?.trim() || "";
     }
 
-    const text = responseData?.choices?.[0]?.message?.content?.trim() ?? "";
-    if (text) return { ok: true as const, metin: text };
+    if (rawText) {
+      return { ok: true, metin: rawText };
+    }
 
-    return { ok: true as const, metin: "Koç boş yanıt döndürdü." };
+    return { ok: false, hata: "Koç yanıt üretemedi." };
   } catch (err: any) {
-    return {
-      ok: true as const,
-      metin: `Bağlantı Hatası: ${err?.message || err?.toString() || "Bilinmeyen ağ hatası"}`,
-    };
+    return { ok: false, hata: `Bağlantı Hatası: ${err?.message || String(err)}` };
   }
 }

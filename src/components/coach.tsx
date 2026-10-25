@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
-import { kocSor } from "@/lib/coach";
-import { profildenHesap } from "@/lib/engine";
-import { useFit } from "@/lib/store";
+import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { kocSor } from "../lib/coach";
+import { profildenHesap } from "../lib/engine";
+import { useFit } from "../lib/store";
+import { useActivity } from "../lib/activityStore";
+import { useDiet } from "../lib/nutritionStore";
 
 interface Mesaj {
   id: string;
@@ -11,21 +13,25 @@ interface Mesaj {
 }
 
 const HIZLI_SORULAR = [
-  "Bugün antrenmanı kaçırdım, telafi etmeli miyim?",
-  "Akşam biraz fazla kaçırdım, yarın ne yapayım?",
-  "Antrenman öncesi ne yemeliyim?",
-  "Kilo verme sürecim yavaşladı, ne önerirsin?",
+  "Son 7 güne göre genel performansım nasıl?",
+  "Dün kaçamak yaptım, bugünkü planım ne olmalı?",
+  "Su tüketimim ve adımlarım hedefe uygun mu?",
+  "Antrenman hacmimi artırmalı mıyım?",
 ];
 
 export function CoachView() {
   const profil = useFit((s) => s.profil);
+  const antrenmanlar = useFit((s) => s.antrenmanlar);
   const h = profil ? profildenHesap(profil) : null;
+
+  const { bugunSuMl, hedefSuMl, bugunAdim, istatistikleriGetir } = useActivity();
+  const { kayitlar, seri, kacamakNedeni, kacamakNotu } = useDiet();
 
   const [mesajlar, setMesajlar] = useState<Mesaj[]>([
     {
       id: "ilk-karsilama",
       gonderen: "koc",
-      metin: "Selam! Ben ScoutFit Koçun. Antrenman programın, beslenmen veya günlük hedeflerin hakkında aklına gelen her şeyi sorabilirsin.",
+      metin: "Selam! Ben ScoutFit Koçun. Antrenmanların, beslenme disiplinin ve haftalık verilerin aklımda. Aklına gelen her şeyi sorabilirsin.",
       zaman: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -102,21 +108,39 @@ export function CoachView() {
       zaman: simdikiZaman,
     };
 
-    // Modelin önceki konuşmayı hatırlaması için son mesajları geçmiş olarak hazırla
-    const apiGecmis = mesajlar.slice(-6).map((m) => ({
-      role: m.gonderen === "kullanici" ? ("user" as const) : ("assistant" as const),
-      content: m.metin,
-    }));
+    // İlk statik karşılama mesajını hariç tutarak geçmişi hazırla
+    const apiGecmis = mesajlar
+      .filter((m) => m.id !== "ilk-karsilama")
+      .slice(-6)
+      .map((m) => ({
+        role: m.gonderen === "kullanici" ? ("user" as const) : ("assistant" as const),
+        content: m.metin,
+      }));
 
     setMesajlar((onceki) => [...onceki, yeniKullaniciMesaji]);
     setSoru("");
     setYukleniyor(true);
     setHata(null);
 
-    const baglam =
-      profil && h
-        ? `Kullanıcı Kilosu: ${profil.kilo}kg, Hedef Kilosu: ${profil.hedefKilo}kg, Boy: ${profil.boy}cm, Günlük Kalori: ${h.gunlukKalori} kcal`
-        : "";
+    const sonKayitDegerleri = Object.values(kayitlar).slice(-7);
+    const kacamakSayisi = sonKayitDegerleri.filter((k) => k === "kacamak").length;
+    const temizGunSayisi = sonKayitDegerleri.filter((k) => k === "temiz").length;
+
+    const sonAntrenman = antrenmanlar[0]
+      ? `Son Antrenman: ${antrenmanlar[0].bolge} (${antrenmanlar[0].sureDk} dk)`
+      : "Kayıtlı antrenman yok";
+
+    const aktiviteIstatistik = istatistikleriGetir();
+
+    const baglam = [
+      profil && h ? `Kilo: ${profil.kilo}kg, Hedef: ${profil.hedef}, Günlük Kalori: ${h.gunlukKalori}kcal` : "",
+      `Bugün: Su ${bugunSuMl}/${hedefSuMl}ml, Adım ${bugunAdim}`,
+      `Haftalık: ${aktiviteIstatistik.haftalikAdim} adım, ${seri} gün seri, ${kacamakSayisi} kaçamak, ${temizGunSayisi} temiz gün`,
+      kacamakNedeni ? `Son kaçamak nedeni: ${kacamakNedeni}` : "",
+      sonAntrenman,
+    ]
+      .filter(Boolean)
+      .join(" | ");
 
     try {
       const res = await kocSor({
@@ -136,10 +160,10 @@ export function CoachView() {
         };
         setMesajlar((onceki) => [...onceki, koctanGelen]);
       } else {
-        setHata("Koç şu an yanıt veremiyor. Lütfen tekrar dene.");
+        setHata(res.hata || "Koç şu an yanıt veremiyor.");
       }
-    } catch {
-      setHata("Bağlantı hatası oluştu.");
+    } catch (err: any) {
+      setHata("Bağlantı hatası: " + (err?.message || "Sunucuya ulaşılamadı."));
     } finally {
       setYukleniyor(false);
     }
@@ -160,16 +184,16 @@ export function CoachView() {
 
   return (
     <div className="mx-auto flex h-[calc(100vh-140px)] max-w-3xl flex-col space-y-4">
-      {/* Başlık & Durum Kartı */}
+      {/* Üst Başlık & AI Rozeti */}
       <div className="flex flex-col gap-3 border-b border-line/40 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">06</span>
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">04</span>
             <span className="text-muted/40">•</span>
             <h1 className="font-display text-2xl font-bold tracking-tight text-ink">ScoutFit AI Koç</h1>
           </div>
           <p className="mt-1 text-xs text-muted">
-            Antrenman, beslenme veya hedeflerin hakkında aklına gelen her şeyi sor.
+            Haftalık antrenman, su ve kaçamak verilerin bağlama eklendi.
           </p>
         </div>
 
@@ -182,7 +206,7 @@ export function CoachView() {
         </div>
       </div>
 
-      {/* Mesaj Akış Alanı */}
+      {/* Mesaj Akışı */}
       <div className="flex-1 space-y-4 overflow-y-auto pr-2">
         {mesajlar.map((m) => (
           <div
@@ -221,12 +245,11 @@ export function CoachView() {
           </div>
         ))}
 
-        {/* Yükleniyor Göstergesi */}
         {yukleniyor && (
           <div className="rounded-2xl border border-line/60 bg-paper/40 p-4 space-y-2 animate-pulse max-w-[70%]">
             <div className="flex items-center gap-2">
               <div className="h-5 w-5 rounded-lg bg-pine/20 flex items-center justify-center text-xs">✨</div>
-              <span className="text-xs font-medium text-muted">Koç yanıt hazırlıyor...</span>
+              <span className="text-xs font-medium text-muted">Koç haftalık verilerini inceliyor...</span>
             </div>
             <div className="space-y-1.5 pt-1">
               <div className="h-2 w-3/4 rounded-full bg-line/60"></div>
@@ -246,7 +269,7 @@ export function CoachView() {
         </div>
       )}
 
-      {/* Önerilen Başlıklar */}
+      {/* Hızlı Sorular */}
       <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
         {HIZLI_SORULAR.map((item) => (
           <button
@@ -261,7 +284,7 @@ export function CoachView() {
         ))}
       </div>
 
-      {/* Modern Entegre Soru Alanı */}
+      {/* Giriş Alanı */}
       <div className="group relative rounded-2xl border border-line bg-paper/60 p-2 shadow-sm transition-all duration-200 focus-within:border-pine focus-within:ring-2 focus-within:ring-pine/20 hover:border-line/80">
         <textarea
           rows={2}
@@ -273,7 +296,6 @@ export function CoachView() {
         />
 
         <div className="mt-2 flex items-center justify-between border-t border-line/40 px-2 pt-2">
-          {/* Mikrofon Butonu */}
           <button
             type="button"
             onClick={sesleDinle}
@@ -287,7 +309,6 @@ export function CoachView() {
             <span>{dinleniyor ? "Dinleniyor..." : "Sesle Sor"}</span>
           </button>
 
-          {/* Gönder Butonu */}
           <button
             type="button"
             onClick={() => soruyuGonder(soru)}

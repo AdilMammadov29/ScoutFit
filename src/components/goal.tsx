@@ -25,7 +25,7 @@ const CINSIYETLER: { id: Cinsiyet; ad: string }[] = [
 export function GoalView() {
   const kayitli = useFit((s) => s.profil);
   const kaydet = useFit((s) => s.kaydetProfil);
-  
+
   const yeniKiloEkle = useEkstra((s: any) => s.kiloEkle);
 
   const [form, setForm] = useState<Profil>(kayitli ?? VARSAYILAN_PROFIL);
@@ -63,21 +63,36 @@ export function GoalView() {
     setNot("Kaydedildi. Bugün ekranı bu sayıları kullanır.");
   }
 
-  // 14 günlük projeksiyon hesaplama
-  const gunlukKaloriFarki = hesap.kaloriFarki; 
-  const gunlukKiloDegisimi = gunlukKaloriFarki / 7700; 
-
+  // 14 günlük gerçekçi projeksiyon (aralıklı dalgalanma bandı)
+  const gunlukKaloriFarki = hesap.kaloriFarki;
+  const teorikGunlukKilo = gunlukKaloriFarki / 7700;
   const bugunkuKilo = form.kilo;
-  const ikiHaftalikTahminler = Array.from({ length: 15 }, (_, gun) => {
-    const tahminiKilo = Number((bugunkuKilo + gunlukKiloDegisimi * gun).toFixed(2));
-    return { gun, kilo: tahminiKilo };
+
+  const ikiHaftalikAraliklar = [0, 3, 7, 10, 14].map((gun) => {
+    if (gun === 0) {
+      return { gun, min: bugunkuKilo, max: bugunkuKilo, hedef: bugunkuKilo };
+    }
+    const teorikDegisim = teorikGunlukKilo * gun;
+    // Biyolojik dalgalanma katsayıları (%75 ihtiyatlı, %125 agresif)
+    const degisim1 = Number((teorikDegisim * 0.75).toFixed(2));
+    const degisim2 = Number((teorikDegisim * 1.25).toFixed(2));
+    const minKilo = Number((bugunkuKilo + Math.min(degisim1, degisim2)).toFixed(2));
+    const maxKilo = Number((bugunkuKilo + Math.max(degisim1, degisim2)).toFixed(2));
+    const ortaKilo = Number((bugunkuKilo + teorikDegisim).toFixed(2));
+
+    return { gun, min: minKilo, max: maxKilo, hedef: ortaKilo };
   });
+
+  const gun14 = ikiHaftalikAraliklar[ikiHaftalikAraliklar.length - 1];
+  const toplamNetDegisimMin = Math.abs(gun14.min - bugunkuKilo).toFixed(2);
+  const toplamNetDegisimMax = Math.abs(gun14.max - bugunkuKilo).toFixed(2);
+  const artisMi = gunlukKaloriFarki > 0;
 
   function kiloKaydiYap(e: React.FormEvent) {
     e.preventDefault();
     const k = Number(yeniKiloInput.replace(",", "."));
     if (!Number.isFinite(k) || k < 35 || k > 250) return;
-    
+
     if (yeniKiloEkle) {
       yeniKiloEkle(k);
     }
@@ -193,18 +208,49 @@ export function GoalView() {
           </fieldset>
         </Panel>
 
-        {/* 2 HAFTALIK TAHMİN PROJEKSİYONU */}
-        <Panel title="2 Haftalık Kilo Tahmin Projeksiyonu">
+        {/* 2 HAFTALIK GERÇEKÇİ KİLO TAHMİN BANDI */}
+        <Panel title="2 Haftalık Kilo Tahmin Bandı">
           <div className="py-4 space-y-4">
-            <p className="text-xs text-muted leading-relaxed">
-              Mevcut kalori dengene ({fark}) göre 14 gün sonra geleceğin tahmini kilo eğrisi:
-            </p>
+            {/* Vurgulu Aralık Kartı */}
+            <div className="rounded-xl border border-pine/30 bg-pine/5 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-muted">
+                  14 Gün Sonraki Beklenti
+                </span>
+                <span className="rounded-full bg-cream px-2 py-0.5 font-mono text-[11px] font-bold text-pine">
+                  {fark} / gün
+                </span>
+              </div>
+              <div className="mt-2 text-xl font-bold text-ink">
+                {gunlukKaloriFarki === 0 ? (
+                  <span>Mevcut kilo korunur (~{bugunkuKilo} kg)</span>
+                ) : (
+                  <span>
+                    {gun14.min} – {gun14.max} kg{" "}
+                    <span className="text-xs font-normal text-muted">
+                      ({artisMi ? "+" : "−"}{Math.min(Number(toplamNetDegisimMin), Number(toplamNetDegisimMax))} ile {Math.max(Number(toplamNetDegisimMin), Number(toplamNetDegisimMax))} kg arası)
+                    </span>
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                * Biyolojik gerçeklik: Su tutulumu, tuz/sodyum tüketimi, glikojen depoları ve uyku düzeni nedeniyle kilo doğrusal bir çizgide ilerlemez. Süreç bu bant aralığında dalgalanarak gerçekleşir.
+              </p>
+            </div>
 
+            {/* Aralık Izgarası */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
-              {ikiHaftalikTahminler.filter((_, idx) => idx % 2 === 0 || idx === 14).map((t) => (
+              {ikiHaftalikAraliklar.map((t) => (
                 <div key={t.gun} className="rounded-xl border border-line bg-cream/30 p-3 text-center">
-                  <span className="text-[10px] uppercase font-bold text-muted">Gün {t.gun}</span>
-                  <div className="text-base font-extrabold text-pine mt-1">{t.kilo} kg</div>
+                  <span className="text-[10px] uppercase font-bold text-muted">
+                    {t.gun === 0 ? "Bugün" : `${t.gun}. Gün`}
+                  </span>
+                  <div className="text-sm font-extrabold text-pine mt-1">
+                    {t.gun === 0 ? `${t.hedef} kg` : `${t.min} – ${t.max}`}
+                  </div>
+                  {t.gun !== 0 && (
+                    <span className="text-[10px] text-muted block mt-0.5">kg aralığı</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -220,7 +266,7 @@ export function GoalView() {
               />
               <button
                 type="submit"
-                className="rounded-xl bg-pine px-5 py-2.5 text-xs font-bold text-cream transition-all hover:opacity-90"
+                className="rounded-xl bg-pine px-5 py-2.5 text-xs font-bold text-cream transition-all hover:opacity-90 active:scale-95"
               >
                 Yeni Kiloyu Kaydet ⚖️
               </button>

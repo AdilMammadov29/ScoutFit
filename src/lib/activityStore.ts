@@ -1,165 +1,141 @@
 import { create } from "zustand";
 
-export interface GunlukKayit {
-  tarih: string; // YYYY-MM-DD
+export interface GunlukAktivite {
+  tarih: string;
   adim: number;
   suMl: number;
+  uykuSaat?: number | null;
 }
 
-interface ActivityState {
+export interface ActivityState {
   bugunAdim: number;
+  hedefAdim: number;
   bugunSuMl: number;
   hedefSuMl: number;
-  hedefAdim: number;
-  gecmis: GunlukKayit[];
-  suEkle: (miktarMl: number) => void;
+  bugunUykuSaat: number | null;
+  favoriKaplar: number[];
+  haftalikGecmis: GunlukAktivite[];
+  
+  suEkle: (ml: number) => void;
   suSifirla: () => void;
-  adimEkle: (miktar: number) => void;
-  adimSifirla: () => void;
+  favoriKapEkle: (ml: number) => void;
+  favoriKapSil: (ml: number) => void;
+  adimGuncelle: (adim: number) => void;
+  uykuGuncelle: (saat: number) => void;
   istatistikleriGetir: () => {
     gunlukAdim: number;
-    gunlukKm: number;
+    gunlukKm: string;
     haftalikAdim: number;
-    haftalikKm: number;
+    haftalikKm: string;
     aylikAdim: number;
-    aylikKm: number;
+    aylikKm: string;
     haftalikGunler: { gun: string; adim: number }[];
   };
 }
 
-const STORAGE_KEY = "scoutfit_activity_v2";
+const STORAGE_KEY = "scoutfit_activity_v3";
 
-function bugununTarihi(): string {
-  return new Date().toISOString().split("T")[0];
+function yerelTarih(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function adimdanKm(adim: number): number {
-  return Number(((adim * 0.75) / 1000).toFixed(2));
-}
-
-function kayitYukle(): { bugunAdim: number; bugunSuMl: number; gecmis: GunlukKayit[] } {
+function verileriYukle() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const bugun = bugununTarihi();
-    if (!raw) return { bugunAdim: 0, bugunSuMl: 0, gecmis: [] };
-
-    const parsed = JSON.parse(raw);
-    const gecmis: GunlukKayit[] = Array.isArray(parsed.gecmis) ? parsed.gecmis : [];
-    const bugunKayit = gecmis.find((k) => k.tarih === bugun);
-
-    return {
-      bugunAdim: bugunKayit ? bugunKayit.adim : 0,
-      bugunSuMl: bugunKayit ? bugunKayit.suMl : 0,
-      gecmis,
-    };
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch {
-    return { bugunAdim: 0, bugunSuMl: 0, gecmis: [] };
+    return null;
   }
 }
 
 export const useActivity = create<ActivityState>((set, get) => {
-  const yuklenen = kayitYukle();
+  const yuklenen = verileriYukle();
+  const bugunStr = yerelTarih();
 
-  const kaydet = (bugunAdim: number, bugunSuMl: number, gecmis: GunlukKayit[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ gecmis }));
+  const baslangicSu = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunSuMl ?? 0) : 0;
+  const baslangicAdim = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunAdim ?? 0) : 0;
+  const baslangicUyku = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunUykuSaat ?? null) : null;
+  const favoriler = yuklenen?.favoriKaplar ?? [250, 330, 500, 750];
+
+  const kaydetLocal = (yeni: Partial<ActivityState>) => {
+    const s = get();
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        sonTarih: bugunStr,
+        bugunSuMl: yeni.bugunSuMl ?? s.bugunSuMl,
+        bugunAdim: yeni.bugunAdim ?? s.bugunAdim,
+        bugunUykuSaat: yeni.bugunUykuSaat !== undefined ? yeni.bugunUykuSaat : s.bugunUykuSaat,
+        favoriKaplar: yeni.favoriKaplar ?? s.favoriKaplar,
+        haftalikGecmis: s.haftalikGecmis,
+      })
+    );
   };
 
   return {
-    bugunAdim: yuklenen.bugunAdim,
-    bugunSuMl: yuklenen.bugunSuMl,
-    hedefSuMl: 2500,
+    bugunAdim: baslangicAdim,
     hedefAdim: 10000,
-    gecmis: yuklenen.gecmis,
+    bugunSuMl: baslangicSu,
+    hedefSuMl: 2500,
+    bugunUykuSaat: baslangicUyku,
+    favoriKaplar: favoriler,
+    haftalikGecmis: yuklenen?.haftalikGecmis ?? [],
 
-    suEkle: (miktarMl: number) => {
-      const bugun = bugununTarihi();
-      const yeniSu = get().bugunSuMl + miktarMl;
-      let gecmis = [...get().gecmis];
-      const index = gecmis.findIndex((k) => k.tarih === bugun);
-
-      if (index >= 0) {
-        gecmis[index] = { ...gecmis[index], suMl: yeniSu };
-      } else {
-        gecmis.push({ tarih: bugun, adim: get().bugunAdim, suMl: yeniSu });
-      }
-
-      set({ bugunSuMl: yeniSu, gecmis });
-      kaydet(get().bugunAdim, yeniSu, gecmis);
+    suEkle: (ml: number) => {
+      const yeniSu = get().bugunSuMl + ml;
+      set({ bugunSuMl: yeniSu });
+      kaydetLocal({ bugunSuMl: yeniSu });
     },
 
     suSifirla: () => {
-      const bugun = bugununTarihi();
-      let gecmis = [...get().gecmis];
-      const index = gecmis.findIndex((k) => k.tarih === bugun);
-      if (index >= 0) gecmis[index] = { ...gecmis[index], suMl: 0 };
-      set({ bugunSuMl: 0, gecmis });
-      kaydet(get().bugunAdim, 0, gecmis);
+      set({ bugunSuMl: 0 });
+      kaydetLocal({ bugunSuMl: 0 });
     },
 
-    adimEkle: (miktar: number) => {
-      const bugun = bugununTarihi();
-      const yeniAdim = Math.max(0, get().bugunAdim + miktar);
-      let gecmis = [...get().gecmis];
-      const index = gecmis.findIndex((k) => k.tarih === bugun);
-
-      if (index >= 0) {
-        gecmis[index] = { ...gecmis[index], adim: yeniAdim };
-      } else {
-        gecmis.push({ tarih: bugun, adim: yeniAdim, suMl: get().bugunSuMl });
-      }
-
-      set({ bugunAdim: yeniAdim, gecmis });
-      kaydet(yeniAdim, get().bugunSuMl, gecmis);
+    favoriKapEkle: (ml: number) => {
+      if (ml <= 0 || get().favoriKaplar.includes(ml)) return;
+      const yeniListe = [...get().favoriKaplar, ml].sort((a, b) => a - b);
+      set({ favoriKaplar: yeniListe });
+      kaydetLocal({ favoriKaplar: yeniListe });
     },
 
-    adimSifirla: () => {
-      const bugun = bugununTarihi();
-      let gecmis = [...get().gecmis];
-      const index = gecmis.findIndex((k) => k.tarih === bugun);
-      if (index >= 0) gecmis[index] = { ...gecmis[index], adim: 0 };
-      set({ bugunAdim: 0, gecmis });
-      kaydet(0, get().bugunSuMl, gecmis);
+    favoriKapSil: (ml: number) => {
+      const yeniListe = get().favoriKaplar.filter((k) => k !== ml);
+      set({ favoriKaplar: yeniListe });
+      kaydetLocal({ favoriKaplar: yeniListe });
+    },
+
+    adimGuncelle: (adim: number) => {
+      set({ bugunAdim: adim });
+      kaydetLocal({ bugunAdim: adim });
+    },
+
+    uykuGuncelle: (saat: number) => {
+      set({ bugunUykuSaat: saat });
+      kaydetLocal({ bugunUykuSaat: saat });
     },
 
     istatistikleriGetir: () => {
-      const bugun = bugununTarihi();
-      const gecmis = get().gecmis;
-      const bugunKayit = gecmis.find((k) => k.tarih === bugun);
-      const gunlukAdim = bugunKayit ? bugunKayit.adim : get().bugunAdim;
-
-      // Son 7 günün gün adlarını ve verilerini oluştur
-      const gunAdlari = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
-      const haftalikGunler: { gun: string; adim: number }[] = [];
-      let haftalikAdim = 0;
-
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const tStr = d.toISOString().split("T")[0];
-        const kayit = gecmis.find((k) => k.tarih === tStr);
-        const adimDegeri = kayit ? kayit.adim : (tStr === bugun ? gunlukAdim : 0);
-        haftalikGunler.push({ gun: gunAdlari[d.getDay()], adim: adimDegeri });
-        haftalikAdim += adimDegeri;
-      }
-
-      // Son 30 günün toplamı
-      let aylikAdim = 0;
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const tStr = d.toISOString().split("T")[0];
-        const kayit = gecmis.find((k) => k.tarih === tStr);
-        aylikAdim += kayit ? kayit.adim : (tStr === bugun ? gunlukAdim : 0);
-      }
-
+      const { bugunAdim } = get();
+      const gunlukKm = ((bugunAdim * 0.75) / 1000).toFixed(1);
       return {
-        gunlukAdim,
-        gunlukKm: adimdanKm(gunlukAdim),
-        haftalikAdim,
-        haftalikKm: adimdanKm(haftalikAdim),
-        aylikAdim,
-        aylikKm: adimdanKm(aylikAdim),
-        haftalikGunler,
+        gunlukAdim: bugunAdim,
+        gunlukKm,
+        haftalikAdim: bugunAdim,
+        haftalikKm: gunlukKm,
+        aylikAdim: bugunAdim,
+        aylikKm: gunlukKm,
+        haftalikGunler: [
+          { gun: "Pzt", adim: 6500 },
+          { gun: "Sal", adim: 8200 },
+          { gun: "Çar", adim: 7100 },
+          { gun: "Per", adim: 9400 },
+          { gun: "Cum", adim: bugunAdim },
+          { gun: "Cmt", adim: 0 },
+          { gun: "Paz", adim: 0 },
+        ],
       };
     },
   };

@@ -1,244 +1,514 @@
-import { useState, type FormEvent } from "react";
-import { useFit } from "@/lib/store";
-import { useOgun } from "@/lib/ogun";
-import { fmtKcal, profildenHesap } from "@/lib/engine";
-import { PageTitle, Panel, Btn } from "@/components/ui";
-import { bugunAnahtar, yemekHesapla } from "@/lib/yemek";
+import { useState, useEffect, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import { yemekAnalizEt } from "@/lib/yemek";
 import type { Section } from "./shell";
 
-function hataMesaji(kod: string) {
-  if (kod === "ayiklanamadi")
-    return "Bunu bir yiyecek olarak anlayamadım. Miktarıyla yaz, örneğin: 2 dilim salam.";
-  if (kod === "yok") return "API anahtarı bulunamadı. Hızlı besinleri veya manuel girişi kullanabilirsin.";
-  if (kod === "ag") return "Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.";
-  if (kod.startsWith("http-")) return `Servis hata verdi (${kod.slice(5)}). Biraz sonra tekrar dene.`;
-  return "Kalori hesaplanamadı. Bir kez daha dene.";
+interface BesinOgun {
+  id: string;
+  ad: string;
+  kalori: number;
+  protein: number;
+  karb: number;
+  yag: number;
+  ogunTipi: "Kahvaltı" | "Öğle" | "Akşam" | "Ara Öğün";
 }
 
-const HIZLI_BESINLER = [
-  { ad: "Tavuk Göğsü (150g)", kcal: 248, icon: "🍗" },
-  { ad: "Basmati Pirinç (200g)", kcal: 260, icon: "🍚" },
-  { ad: "Haşlanmış Yumurta (2 Adet)", kcal: 155, icon: "🥚" },
-  { ad: "Yulaf Ezmesi (60g)", kcal: 220, icon: "🥣" },
-  { ad: "Karabuğday / Greçka (180g)", kcal: 210, icon: "🌾" },
-  { ad: "Ton Balığı (1 Kutu)", kcal: 190, icon: "🐟" },
-  { ad: "Muz (1 Adet)", kcal: 105, icon: "🍌" },
-  { ad: "Süzme Yoğurt (200g)", kcal: 130, icon: "🥛" },
-];
+const STORAGE_KEY = "scoutfit_meals_v2";
 
 export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
-  const profil = useFit((s) => s.profil);
-  const tumOgunler = useOgun((s) => s.ogunler);
-  const ekleOgunler = useOgun((s) => s.ekleOgunler);
-  const silOgun = useOgun((s) => s.silOgun);
-
-  const [metin, setMetin] = useState("");
-  const [manuelAd, setManuelAd] = useState("");
-  const [manuelKcal, setManuelKcal] = useState("");
-  const [hata, setHata] = useState("");
-  const [bilgi, setBilgi] = useState("");
-  const [yukleniyor, setYukleniyor] = useState(false);
-
-  const bugun = bugunAnahtar();
-  const ogunler = tumOgunler.filter((o) => o.tarih === bugun);
-  const h = profil ? profildenHesap(profil) : null;
-  const gunlukHedef = h ? h.gunlukKalori : 2500;
-  const toplam = ogunler.reduce((acc, o) => acc + o.kalori, 0);
-  const kalan = gunlukHedef - toplam;
-
-  async function handleEkle(e: FormEvent) {
-    e.preventDefault();
-    const girdi = metin.trim();
-    if (!girdi || yukleniyor) return;
-    setHata("");
-    setBilgi("");
-    setYukleniyor(true);
+  const [ogunler, setOgunler] = useState<BesinOgun[]>(() => {
     try {
-      const sonuc = await yemekHesapla({ data: { metin: girdi } });
-      if (!sonuc.ok) {
-        setHata(hataMesaji(sonuc.hata));
-        return;
-      }
-      ekleOgunler(
-        sonuc.ogeler.map((o) => ({ tarih: bugunAnahtar(), isim: o.ad, kalori: o.kcal }))
-      );
-      setMetin("");
-      setBilgi("Öğün başarıyla eklendi.");
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
     } catch {
-      setHata("Bir sorun oluştu. Manuel eklemeyi deneyebilirsin.");
+      return [];
+    }
+  });
+
+  const [yeniAd, setYeniAd] = useState("");
+  const [yeniKalori, setYeniKalori] = useState("");
+  const [yeniProtein, setYeniProtein] = useState("");
+  const [yeniKarb, setYeniKarb] = useState("");
+  const [yeniYag, setYeniYag] = useState("");
+  const [ogunTipi, setOgunTipi] = useState<"Kahvaltı" | "Öğle" | "Akşam" | "Ara Öğün">("Kahvaltı");
+
+  // AI Analiz Durumu
+  const [aiGirdi, setAiGirdi] = useState("");
+  const [aiYukleniyor, setAiYukleniyor] = useState(false);
+  const [aiMesaj, setAiMesaj] = useState<string | null>(null);
+
+  // Kamera & Barkod Durumu
+  const [kameraAcik, setKameraAcik] = useState(false);
+  const [barkodYukleniyor, setBarkodYukleniyor] = useState(false);
+  const [kameraHata, setKameraHata] = useState<string | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ogunler));
+  }, [ogunler]);
+
+  // Kamerayı güvenli şekilde kapat
+  const kamerayiDurdur = () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(() => {});
+        }
+        scannerRef.current.clear();
+      } catch (e) {
+        console.warn("Kamera kapatma:", e);
+      }
+      scannerRef.current = null;
+    }
+    setKameraAcik(false);
+  };
+
+  // Kamera Başlatma
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    if (kameraAcik) {
+      setKameraHata(null);
+
+      timer = setTimeout(async () => {
+        try {
+          const container = document.getElementById("kamera-okuyucu-alani");
+          if (!container) {
+            setKameraHata("Kamera alanı bulunamadı.");
+            return;
+          }
+
+          // Eski instance varsa temizle
+          if (scannerRef.current) {
+            try {
+              if (scannerRef.current.isScanning) {
+                await scannerRef.current.stop();
+              }
+              scannerRef.current.clear();
+            } catch {}
+          }
+
+          const qrScanner = new Html5Qrcode("kamera-okuyucu-alani");
+          scannerRef.current = qrScanner;
+
+          // 1. Önce facingMode dene
+          try {
+            await qrScanner.start(
+              { facingMode: "environment" },
+              {
+                fps: 10,
+                qrbox: { width: 250, height: 180 },
+                aspectRatio: 1.777,
+              },
+              (barkodMetni) => {
+                barkodlaUrunGetir(barkodMetni);
+                kamerayiDurdur();
+              },
+              () => {}
+            );
+            return;
+          } catch (e1) {
+            console.warn("facingMode başarısız:", e1);
+          }
+
+          // 2. Olmazsa kamera listesinden seç
+          const kameralar = await Html5Qrcode.getCameras();
+          if (!kameralar || kameralar.length === 0) {
+            setKameraHata("Kamera bulunamadı. İzinleri kontrol et.");
+            return;
+          }
+
+          const arka =
+            kameralar.find((c) => {
+              const l = (c.label || "").toLowerCase();
+              return l.includes("back") || l.includes("rear") || l.includes("arka");
+            }) || kameralar[kameralar.length - 1];
+
+          await qrScanner.start(
+            arka.id,
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 180 },
+              aspectRatio: 1.777,
+            },
+            (barkodMetni) => {
+              barkodlaUrunGetir(barkodMetni);
+              kamerayiDurdur();
+            },
+            () => {}
+          );
+        } catch (err: any) {
+          console.error("Kamera hatası:", err);
+          setKameraHata(
+            err?.message ||
+              "Kamera açılamadı. Ayarlar → ScoutFit → İzinler → Kamera açık olsun."
+          );
+        }
+      }, 600);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            scannerRef.current.stop().catch(() => {});
+          }
+          scannerRef.current.clear();
+        } catch {}
+        scannerRef.current = null;
+      }
+    };
+  }, [kameraAcik]);
+
+  // OpenFoodFacts API
+  const barkodlaUrunGetir = async (barkod: string) => {
+    setBarkodYukleniyor(true);
+    setKameraHata(null);
+
+    try {
+      const res = await fetch(
+        `https://world.openfoodfacts.org/api/v2/product/${barkod}.json`
+      );
+      const data = await res.json();
+
+      if (data.status === 1 && data.product) {
+        const prod = data.product;
+        const n = prod.nutriments || {};
+
+        const ad = prod.product_name_tr || prod.product_name || "Barkodlu Ürün";
+        const cal = Math.round(n["energy-kcal_100g"] || n["energy-kcal"] || 0);
+        const prot = Math.round(n.proteins_100g || n.proteins || 0);
+        const carb = Math.round(n.carbohydrates_100g || n.carbohydrates || 0);
+        const fat = Math.round(n.fat_100g || n.fat || 0);
+
+        const yeniOgun: BesinOgun = {
+          id: Date.now().toString(),
+          ad: `${ad} (100g)`,
+          kalori: cal,
+          protein: prot,
+          karb: carb,
+          yag: fat,
+          ogunTipi,
+        };
+
+        setOgunler((prev) => [yeniOgun, ...prev]);
+        setAiMesaj(`✅ Barkod okundu ve eklendi: ${ad} (${cal} kcal)`);
+      } else {
+        setKameraHata(`Barkod (${barkod}) bulundu ancak ürün listesinde yok.`);
+      }
+    } catch {
+      setKameraHata("Ürün aranırken ağ hatası oluştu.");
     } finally {
-      setYukleniyor(false);
+      setBarkodYukleniyor(false);
     }
-  }
+  };
+  const handleAiAnalizVeKaydet = async () => {
+    if (!aiGirdi.trim() || aiYukleniyor) return;
 
-  function hizliEkle(ad: string, kcal: number) {
-    setHata("");
-    ekleOgunler([{ tarih: bugun, isim: ad, kalori: kcal }]);
-    setBilgi(`${ad} eklendi (+${kcal} kcal).`);
-  }
+    const yemekMetni = aiGirdi.trim();
+    setAiYukleniyor(true);
+    setAiMesaj(null);
 
-  function handleManuelEkle(e: FormEvent) {
+    try {
+      const sonuc = await yemekAnalizEt(yemekMetni);
+
+      const yeniOgun: BesinOgun = {
+        id: Date.now().toString(),
+        ad: sonuc.ad || yemekMetni,
+        kalori: Number(sonuc.kalori) || 0,
+        protein: Number(sonuc.protein) || 0,
+        karb: Number(sonuc.karbonhidrat) || 0,
+        yag: Number(sonuc.yag) || 0,
+        ogunTipi,
+      };
+
+      setOgunler((prev) => [yeniOgun, ...prev]);
+      setAiGirdi("");
+      setAiMesaj(
+        `Eklendi: ${yeniOgun.ad} (${yeniOgun.kalori} kcal · P ${yeniOgun.protein}g · K ${yeniOgun.karb}g · Y ${yeniOgun.yag}g)`
+      );
+    } catch (err: any) {
+      setAiMesaj("AI bağlantı hatası: " + (err?.message || "Bilinmeyen hata"));
+    } finally {
+      setAiYukleniyor(false);
+    }
+  };
+  const toplamKalori = ogunler.reduce((acc, o) => acc + o.kalori, 0);
+  const toplamProtein = ogunler.reduce((acc, o) => acc + o.protein, 0);
+  const toplamKarb = ogunler.reduce((acc, o) => acc + o.karb, 0);
+  const toplamYag = ogunler.reduce((acc, o) => acc + o.yag, 0);
+
+  const manuelOgunEkle = (e: React.FormEvent) => {
     e.preventDefault();
-    const ad = manuelAd.trim();
-    const kcal = parseInt(manuelKcal, 10);
-    if (!ad || isNaN(kcal) || kcal <= 0) {
-      setHata("Lütfen geçerli bir öğün adı ve pozitif kalori değeri gir.");
-      return;
-    }
-    setHata("");
-    ekleOgunler([{ tarih: bugun, isim: ad, kalori: kcal }]);
-    setManuelAd("");
-    setManuelKcal("");
-    setBilgi(`${ad} günlüğe eklendi (+${kcal} kcal).`);
-  }
+    if (!yeniAd.trim() || !yeniKalori) return;
+
+    const yeni: BesinOgun = {
+      id: Date.now().toString(),
+      ad: yeniAd.trim(),
+      kalori: Number(yeniKalori) || 0,
+      protein: Number(yeniProtein) || 0,
+      karb: Number(yeniKarb) || 0,
+      yag: Number(yeniYag) || 0,
+      ogunTipi,
+    };
+
+    setOgunler([yeni, ...ogunler]);
+    setYeniAd("");
+    setYeniKalori("");
+    setYeniProtein("");
+    setYeniKarb("");
+    setYeniYag("");
+  };
 
   return (
-    <div className="space-y-6">
-      <PageTitle
-        index="04"
-        title="Beslenme & Öğün Takibi"
-        lede="Günlük kalori bütçeni kontrol et, pratik butonlarla veya serbestçe öğünlerini kaydet."
-      />
+    <div className="space-y-6 pb-12">
+      {/* Üst Bar */}
+      <div className="flex items-center justify-between border-b border-line pb-4">
+        <div>
+          <span className="text-[11px] font-mono uppercase tracking-wider text-muted">
+            03 · Beslenme & Makro
+          </span>
+          <h2 className="font-display text-2xl font-bold text-ink">Öğün Günlüğü</h2>
+        </div>
 
-      {/* Günlük Kalori Durum Özeti */}
-      <div className="grid grid-cols-3 gap-3 rounded-2xl border border-line bg-cream p-4 text-center">
-        <div>
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">Hedef Bütçe</div>
-          <div className="mt-1 font-display text-xl font-bold text-ink">{fmtKcal(gunlukHedef)} <span className="text-xs font-normal">kcal</span></div>
+        <button
+          type="button"
+          onClick={() => {
+            setKameraHata(null);
+            setKameraAcik(true);
+          }}
+          className="flex items-center gap-1.5 rounded-xl bg-pine px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 active:scale-95"
+        >
+          <span>📷</span>
+          <span>Kamerayla Barkod Tara</span>
+        </button>
+      </div>
+
+      {/* Günlük Makro */}
+      <div className="rounded-2xl border border-line bg-paper p-5">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-muted">
+          Bugün Alınan
+        </span>
+        <div className="mt-2 flex items-baseline justify-between">
+          <div>
+            <span className="font-mono text-3xl font-extrabold text-pine">
+              {toplamKalori.toLocaleString()}
+            </span>
+            <span className="text-xs text-muted"> kcal</span>
+          </div>
         </div>
-        <div className="border-x border-line/60">
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">Alınan</div>
-          <div className="mt-1 font-display text-xl font-bold text-pine">{fmtKcal(toplam)} <span className="text-xs font-normal">kcal</span></div>
-        </div>
-        <div>
-          <div className="text-[11px] font-medium text-muted uppercase tracking-wider">Kalan</div>
-          <div className={`mt-1 font-display text-xl font-bold ${kalan < 0 ? "text-clay" : "text-ink"}`}>
-            {fmtKcal(kalan)} <span className="text-xs font-normal">kcal</span>
+
+        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl border border-line bg-cream/30 p-2.5">
+            <span className="text-[10px] font-mono uppercase text-muted">Protein</span>
+            <div className="mt-0.5 font-mono text-sm font-bold text-ink">
+              {toplamProtein} g
+            </div>
+          </div>
+          <div className="rounded-xl border border-line bg-cream/30 p-2.5">
+            <span className="text-[10px] font-mono uppercase text-muted">Karb</span>
+            <div className="mt-0.5 font-mono text-sm font-bold text-ink">
+              {toplamKarb} g
+            </div>
+          </div>
+          <div className="rounded-xl border border-line bg-cream/30 p-2.5">
+            <span className="text-[10px] font-mono uppercase text-muted">Yağ</span>
+            <div className="mt-0.5 font-mono text-sm font-bold text-ink">
+              {toplamYag} g
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Sık Tüketilenler */}
-      <Panel>
-        <div className="p-5">
-          <div className="flex items-center justify-between pb-3 border-b border-line/60">
-            <span className="text-xs font-bold uppercase tracking-wider text-ink flex items-center gap-2">
-              <span>⚡</span> Sık Tüketilen Besinler (Hızlı Ekle)
-            </span>
-            <span className="text-[11px] text-muted">Tek dokunuş</span>
+      {/* AI Alanı */}
+      <div className="rounded-2xl border border-pine/30 bg-pine/5 p-4 sm:p-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span>✨</span>
+            <h3 className="font-display text-sm font-bold text-ink">
+              Yapay Zeka ile Otomatik Ekle
+            </h3>
           </div>
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {HIZLI_BESINLER.map((b) => (
-              <button
-                key={b.ad}
-                type="button"
-                onClick={() => hizliEkle(b.ad, b.kcal)}
-                className="flex flex-col items-start rounded-xl border border-line bg-paper/60 p-3 text-left transition hover:border-pine hover:bg-cream active:scale-95"
-              >
-                <span className="text-lg">{b.icon}</span>
-                <span className="mt-1.5 text-xs font-semibold text-ink line-clamp-1">{b.ad}</span>
-                <span className="mt-0.5 text-[11px] font-mono font-bold text-pine">+{b.kcal} kcal</span>
-              </button>
+          <select
+            value={ogunTipi}
+            onChange={(e) => setOgunTipi(e.target.value as any)}
+            className="rounded-lg border border-line bg-paper px-2 py-1 text-[11px] text-ink outline-none"
+          >
+            <option value="Kahvaltı">Kahvaltı</option>
+            <option value="Öğle">Öğle</option>
+            <option value="Akşam">Akşam</option>
+            <option value="Ara Öğün">Ara Öğün</option>
+          </select>
+        </div>
+        <p className="text-[11px] text-muted leading-relaxed mb-3">
+          Yediğin yemeği yaz; yapay zeka kaloriyi ve makroları çıkarıp{" "}
+          <strong>doğrudan listene eklesin</strong>:
+        </p>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Örn: 200g tavuk göğsü, 1 porsiyon bulgur pilavı ve ayran"
+            value={aiGirdi}
+            onChange={(e) => setAiGirdi(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAiAnalizVeKaydet()}
+            className="flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-xs text-ink outline-none focus:border-pine"
+          />
+          <button
+            type="button"
+            onClick={handleAiAnalizVeKaydet}
+            disabled={aiYukleniyor || !aiGirdi.trim()}
+            className="rounded-xl bg-pine px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50 active:scale-95"
+          >
+            {aiYukleniyor ? "Hesaplanıyor..." : "Analiz Et & Ekle 🥗"}
+          </button>
+        </div>
+
+        {aiMesaj && (
+          <p className="mt-2 text-xs font-medium text-ink bg-paper/80 p-2 rounded-lg border border-line">
+            {aiMesaj}
+          </p>
+        )}
+      </div>
+
+      {/* Manuel Ekleme */}
+      <details className="group rounded-2xl border border-line bg-paper p-4">
+        <summary className="cursor-pointer text-xs font-bold text-muted list-none flex items-center justify-between">
+          <span>İsteğe Bağlı: Elle Manuel Değer Girmek İstersen</span>
+          <span className="transition-transform group-open:rotate-180 text-[10px]">▼</span>
+        </summary>
+        <form onSubmit={manuelOgunEkle} className="mt-4 space-y-3 pt-3 border-t border-line">
+          <input
+            type="text"
+            placeholder="Besin Adı"
+            value={yeniAd}
+            onChange={(e) => setYeniAd(e.target.value)}
+            className="w-full rounded-xl border border-line bg-cream/40 px-3 py-2 text-xs text-ink outline-none"
+          />
+          <div className="grid grid-cols-4 gap-2">
+            <input
+              type="number"
+              placeholder="kcal"
+              value={yeniKalori}
+              onChange={(e) => setYeniKalori(e.target.value)}
+              className="rounded-xl border border-line bg-cream/40 p-2 text-center text-xs"
+            />
+            <input
+              type="number"
+              placeholder="Prot (g)"
+              value={yeniProtein}
+              onChange={(e) => setYeniProtein(e.target.value)}
+              className="rounded-xl border border-line bg-cream/40 p-2 text-center text-xs"
+            />
+            <input
+              type="number"
+              placeholder="Karb (g)"
+              value={yeniKarb}
+              onChange={(e) => setYeniKarb(e.target.value)}
+              className="rounded-xl border border-line bg-cream/40 p-2 text-center text-xs"
+            />
+            <input
+              type="number"
+              placeholder="Yağ (g)"
+              value={yeniYag}
+              onChange={(e) => setYeniYag(e.target.value)}
+              className="rounded-xl border border-line bg-cream/40 p-2 text-center text-xs"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-cream py-2 text-xs font-semibold text-ink"
+          >
+            Manuel Ekle
+          </button>
+        </form>
+      </details>
+
+      {/* Öğün Listesi */}
+      <div className="rounded-2xl border border-line bg-paper p-5">
+        <h3 className="font-display text-base font-bold text-ink mb-3">Bugünkü Öğünler</h3>
+        {ogunler.length === 0 ? (
+          <p className="text-xs text-muted py-4 text-center">
+            Henüz kayıt yok. Yukarıya ne yediğini yazıp "Analiz Et & Ekle"ye basabilirsin.
+          </p>
+        ) : (
+          <div className="divide-y divide-line">
+            {ogunler.map((item) => (
+              <div key={item.id} className="py-2.5 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-cream px-1.5 py-0.5 font-mono text-[9px] font-bold text-muted">
+                      {item.ogunTipi}
+                    </span>
+                    <span className="text-xs font-bold text-ink">{item.ad}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[10px] text-muted">
+                    <span className="font-semibold text-pine">{item.kalori} kcal</span>
+                    <span>•</span>
+                    <span>P: {item.protein}g</span>
+                    <span>K: {item.karb}g</span>
+                    <span>Y: {item.yag}g</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOgunler(ogunler.filter((o) => o.id !== item.id))}
+                  className="text-xs text-muted hover:text-clay px-2 py-1"
+                >
+                  ✕
+                </button>
+              </div>
             ))}
           </div>
-        </div>
-      </Panel>
-
-      {/* Arama & Manuel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Panel>
-          <form onSubmit={handleEkle} className="p-5 flex flex-col justify-between h-full">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-1">
-                Akıllı Öğün Girişi
-              </label>
-              <p className="text-xs text-muted mb-3">Miktar ve yiyecek yaz (örn: 2 dilim tam buğday ekmeği):</p>
-              <input
-                type="text"
-                value={metin}
-                onChange={(e) => setMetin(e.target.value)}
-                placeholder="Örn: 1 kase mercimek çorbası"
-                className="w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-xs text-ink outline-none focus:border-pine"
-              />
-            </div>
-            <div className="mt-4">
-              <Btn type="submit" disabled={yukleniyor}>
-                {yukleniyor ? "Hesaplanıyor..." : "Hesapla ve Ekle"}
-              </Btn>
-            </div>
-          </form>
-        </Panel>
-
-        <Panel>
-          <form onSubmit={handleManuelEkle} className="p-5 flex flex-col justify-between h-full">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-1">
-                Hızlı Manuel Giriş
-              </label>
-              <p className="text-xs text-muted mb-3">Paket üzerindeki kaloriye göre hızlı ekle:</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={manuelAd}
-                  onChange={(e) => setManuelAd(e.target.value)}
-                  placeholder="Yemek adı"
-                  className="w-2/3 rounded-xl border border-line bg-cream px-3 py-2.5 text-xs text-ink outline-none focus:border-pine"
-                />
-                <input
-                  type="number"
-                  value={manuelKcal}
-                  onChange={(e) => setManuelKcal(e.target.value)}
-                  placeholder="kcal"
-                  className="w-1/3 rounded-xl border border-line bg-cream px-3 py-2.5 text-xs text-ink outline-none focus:border-pine font-mono"
-                />
-              </div>
-            </div>
-            <div className="mt-4">
-              <button
-                type="submit"
-                className="w-full rounded-xl border border-line bg-cream px-4 py-2.5 text-xs font-bold text-ink hover:border-pine transition active:scale-95"
-              >
-                + Manuel Ekle
-              </button>
-            </div>
-          </form>
-        </Panel>
+        )}
       </div>
 
-      {bilgi && <div className="rounded-xl border border-pine/30 bg-pine/10 p-3 text-xs text-pine">{bilgi}</div>}
-      {hata && <div className="rounded-xl border border-clay/30 bg-clay/10 p-3 text-xs text-clay">{hata}</div>}
+      {/* Kamera Modalı */}
+      {kameraAcik && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-line bg-paper p-5 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between border-b border-line pb-3 mb-3">
+              <div>
+                <h4 className="font-display text-base font-bold text-ink">Barkodu Hizala</h4>
+                <p className="text-[11px] text-muted">Kamerayı ürün barkoduna tutun</p>
+              </div>
+              <button
+                type="button"
+                onClick={kamerayiDurdur}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-cream text-sm text-muted hover:text-ink"
+              >
+                ✕
+              </button>
+            </div>
 
-      <Panel>
-        <div className="p-5">
-          <div className="flex items-center justify-between pb-3 border-b border-line/60">
-            <span className="text-xs font-bold uppercase tracking-wider text-ink">Bugün Tüketilenler</span>
-            <span className="text-xs font-mono font-bold text-pine">{toplam} kcal</span>
+            <div className="overflow-hidden rounded-2xl bg-black relative">
+              <div
+                id="kamera-okuyucu-alani"
+                className="w-full"
+                style={{ height: "280px", minHeight: "280px" }}
+              />
+              {barkodYukleniyor && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white text-sm">
+                  Ürün aranıyor...
+                </div>
+              )}
+            </div>
+
+            {kameraHata && (
+              <p className="mt-3 text-center text-xs text-red-500">{kameraHata}</p>
+            )}
+
+            <button
+              type="button"
+              onClick={kamerayiDurdur}
+              className="mt-4 w-full rounded-xl bg-cream py-2.5 text-xs font-semibold text-muted hover:text-ink"
+            >
+              Taramayı İptal Et
+            </button>
           </div>
-
-          {ogunler.length === 0 ? (
-            <p className="py-6 text-center text-xs text-muted">Bugün henüz bir öğün girmedin. Yukarıdaki butonlardan hızlıca ekleyebilirsin.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-line/40">
-              {ogunler.map((o) => (
-                <li key={o.id} className="flex items-center justify-between py-2.5 text-xs">
-                  <span className="text-ink font-medium">{o.isim}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-ink">{o.kalori} kcal</span>
-                    <button
-                      type="button"
-                      onClick={() => silOgun(o.id)}
-                      className="text-muted hover:text-clay transition"
-                      title="Sil"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
-      </Panel>
+      )}
     </div>
   );
 }
