@@ -122,7 +122,6 @@ export async function bulutaBaglan(kullaniciId: string): Promise<void> {
       paketUygula(kayitli);
       sonGonderilen = JSON.stringify(anlikPaket());
     } else {
-      // Hesabın ilk girişi: bu tarayıcıdaki mevcut veriler hesaba taşınır.
       sonGonderilen = "";
       await kuyrugaAl();
       if (benim !== nesil) return;

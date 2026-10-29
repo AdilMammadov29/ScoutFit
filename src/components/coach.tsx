@@ -248,8 +248,7 @@ export function CoachView() {
         {yukleniyor && (
           <div className="rounded-2xl border border-line/60 bg-paper/40 p-4 space-y-2 animate-pulse max-w-[70%]">
             <div className="flex items-center gap-2">
-              <div className="h-5 w-5 rounded-lg bg-pine/20 flex items-center justify-center text-xs">✨</div>
-              <span className="text-xs font-medium text-muted">Koç haftalık verilerini inceliyor...</span>
+            <div className="h-2 w-2 rounded-full bg-emerald-400"></div>              <span className="text-xs font-medium text-muted">Koç haftalık verilerini inceliyor...</span>
             </div>
             <div className="space-y-1.5 pt-1">
               <div className="h-2 w-3/4 rounded-full bg-line/60"></div>

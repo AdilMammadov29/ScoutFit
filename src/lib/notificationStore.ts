@@ -6,44 +6,79 @@ export interface Bildirim {
   mesaj: string;
   zaman: string;
   okundu: boolean;
+  tip?: "su" | "adim" | "hedef" | "sistem";
 }
 
 interface NotificationState {
   bildirimler: Bildirim[];
   panelAcik: boolean;
   paneliAcKapat: () => void;
+  bildirimEkle: (baslik: string, mesaj: string, tip?: Bildirim["tip"]) => void;
   okunduOlarakIsaretle: (id: string) => void;
+  tumunuOkunduYap: () => void;
+  bildirimSil: (id: string) => void;
+  tumunuTemizle: () => void;
 }
 
-export const useNotifications = create<NotificationState>((set) => ({
+const STORAGE_KEY = "scoutfit_notifications_v1";
+
+function kayitliBildirimleriYukle(): Bildirim[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export const useNotifications = create<NotificationState>((set, get) => ({
   panelAcik: false,
-  bildirimler: [
-    {
-      id: "1",
-      baslik: "Su Hatırlatması",
-      mesaj: "Günlük hedefine ulaşmak için 2 bardak daha su içmelisin.",
-      zaman: "15 dk önce",
-      okundu: false,
-    },
-    {
-      id: "2",
-      baslik: "Haftalık Tempo",
-      mesaj: "Haftalık 50.000 adım hedefine %80 oranında yaklaştın.",
-      zaman: "2 saat önce",
-      okundu: false,
-    },
-    {
-      id: "3",
-      baslik: "Beslenme Serisi",
-      mesaj: "Dünkü disiplinli beslenmenle zinciri 7 güne çıkardın.",
-      zaman: "Dün",
-      okundu: true,
-    },
-  ],
+  bildirimler: kayitliBildirimleriYukle(),
 
   paneliAcKapat: () => set((s) => ({ panelAcik: !s.panelAcik })),
+
+  bildirimEkle: (baslik, mesaj, tip = "sistem") => {
+    const yeniBildirim: Bildirim = {
+      id: Date.now().toString(),
+      baslik,
+      mesaj,
+      zaman: "Şimdi",
+      okundu: false,
+      tip,
+    };
+
+    set((state) => {
+      const guncel = [yeniBildirim, ...state.bildirimler].slice(0, 20); // Son 20 bildirimi tut
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guncel));
+      return { bildirimler: guncel };
+    });
+  },
+
   okunduOlarakIsaretle: (id) =>
-    set((s) => ({
-      bildirimler: s.bildirimler.map((b) => (b.id === id ? { ...b, okundu: true } : b)),
-    })),
+    set((state) => {
+      const guncel = state.bildirimler.map((b) =>
+        b.id === id ? { ...b, okundu: true } : b
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guncel));
+      return { bildirimler: guncel };
+    }),
+
+  tumunuOkunduYap: () =>
+    set((state) => {
+      const guncel = state.bildirimler.map((b) => ({ ...b, okundu: true }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guncel));
+      return { bildirimler: guncel };
+    }),
+
+  bildirimSil: (id) =>
+    set((state) => {
+      const guncel = state.bildirimler.filter((b) => b.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guncel));
+      return { bildirimler: guncel };
+    }),
+
+  tumunuTemizle: () => {
+    localStorage.removeItem(STORAGE_KEY);
+    set({ bildirimler: [] });
+  },
 }));

@@ -10,7 +10,7 @@
     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Donanım özellikleri (zorunlu değil) -->
+    <!-- Donanım özellikleri -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
@@ -37,6 +37,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Google OAuth & Supabase Geri Dönüş (Deep Link) -->
+           <intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="scoutfit" android:host="auth" android:pathPrefix="/callback" />
+</intent-filter>
+
         </activity>
 
         <provider
@@ -49,8 +57,9 @@
                 android:resource="@xml/file_paths" />
         </provider>
     </application>
+
     <meta-data
-    android:name="com.google.mlkit.vision.DEPENDENCIES"
-    android:value="barcode_ui" />
+        android:name="com.google.mlkit.vision.DEPENDENCIES"
+        android:value="barcode_ui" />
 
 </manifest>

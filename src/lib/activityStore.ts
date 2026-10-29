@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { adimTakibiniBaslat } from "./pedometer";
+import { useNotifications } from "./notificationStore";
+
 export interface GunlukAktivite {
   tarih: string;
   adim: number;
@@ -15,7 +17,7 @@ export interface ActivityState {
   bugunUykuSaat: number | null;
   favoriKaplar: number[];
   haftalikGecmis: GunlukAktivite[];
-  
+
   suEkle: (ml: number) => void;
   suSifirla: () => void;
   favoriKapEkle: (ml: number) => void;
@@ -84,9 +86,21 @@ export const useActivity = create<ActivityState>((set, get) => {
     haftalikGecmis: yuklenen?.haftalikGecmis ?? [],
 
     suEkle: (ml: number) => {
-      const yeniSu = get().bugunSuMl + ml;
+      const oncekiSu = get().bugunSuMl;
+      const yeniSu = oncekiSu + ml;
+      const hedef = get().hedefSuMl;
+
       set({ bugunSuMl: yeniSu });
       kaydetLocal({ bugunSuMl: yeniSu });
+
+      // Hedefe ilk kez ulaşıldığında bildirim düşer
+      if (yeniSu >= hedef && oncekiSu < hedef) {
+        useNotifications.getState().bildirimEkle(
+          "Su Hedefi Tamamlandı",
+          `Tebrikler! Günlük ${hedef} ml su hedefine ulaştın.`,
+          "su"
+        );
+      }
     },
 
     suSifirla: () => {
@@ -108,8 +122,20 @@ export const useActivity = create<ActivityState>((set, get) => {
     },
 
     adimGuncelle: (adim: number) => {
+      const oncekiAdim = get().bugunAdim;
+      const hedef = get().hedefAdim;
+
       set({ bugunAdim: adim });
       kaydetLocal({ bugunAdim: adim });
+
+      // Adım hedefine ilk kez ulaşıldığında bildirim düşer
+      if (adim >= hedef && oncekiAdim < hedef) {
+        useNotifications.getState().bildirimEkle(
+          "Adım Hedefi Tamamlandı",
+          `Harika tempo! Günlük ${hedef.toLocaleString()} adım hedefine ulaştın.`,
+          "adim"
+        );
+      }
     },
 
     uykuGuncelle: (saat: number) => {
@@ -135,14 +161,12 @@ export const useActivity = create<ActivityState>((set, get) => {
           { gun: "Cum", adim: bugunAdim },
           { gun: "Cmt", adim: 0 },
           { gun: "Paz", adim: 0 },
-          
         ],
       };
     },
-    
   };
 });
-// Cihaz adım sensörünü dinler ve bugunAdim değerini günceller
+
 // Cihaz adım sensörünü dinler ve bugunAdim değerini günceller
 adimTakibiniBaslat((gelenAdim: number) => {
   const store = useActivity.getState();

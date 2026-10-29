@@ -1,61 +1,52 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces", "Iowan Old Style", Palatino, Georgia, serif;
-
-  --color-paper: #efeae1;
-  --color-cream: #faf7f2;
-  --color-ink: #1c1915;
-  --color-muted: #6f675e;
-  --color-line: #e3dbd0;
-  --color-pine: #1e4636;
-  --color-clay: #9a3e18;
-
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-}
-
 @layer base {
+  /* Açık Mod (Monochrome Minimalist) */
+  :root {
+    --color-paper: #f4f4f5;
+    --color-cream: #ffffff;
+    --color-ink: #09090b;
+    --color-muted: #71717a;
+    --color-line: #e4e4e7;
+    --color-pine: #18181b;
+    --color-pine-text: #ffffff;
+    --color-clay: #52525b;
+  }
+
+  /* Koyu Mod (OLED Titanium Dark) */
+  html.dark, :root[class~="dark"] {
+    --color-paper: #09090b;
+    --color-cream: #141417;
+    --color-ink: #f4f4f5;
+    --color-muted: #8e8e93;
+    --color-line: #222226;
+    --color-pine: #f4f4f5;
+    --color-pine-text: #09090b;
+    --color-clay: #71717a;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    background: var(--color-paper);
+    background-color: var(--color-paper);
     color: var(--color-ink);
-    font-family: var(--font-sans);
   }
 
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
-
-  h1,
-  h2 {
-    text-wrap: balance;
-  }
-
-  p {
-    text-wrap: pretty;
-  }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition: none !important;
-  }
-}
-[data-tema="koyu"] {
-  --color-paper: #14120f;
-  --color-cream: #1d1a16;
-  --color-ink: #efeae1;
-  --color-muted: #a39a8d;
-  --color-line: #2f2b25;
-  --color-pine: #7fb69a;
-  --color-clay: #e08a5f;
+@theme {
+  --color-paper: var(--color-paper);
+  --color-cream: var(--color-cream);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-line: var(--color-line);
+  --color-pine: var(--color-pine);
+  --color-clay: var(--color-clay);
 }

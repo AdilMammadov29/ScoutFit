@@ -97,16 +97,16 @@ export const useFit = create<FitState>()(
     }),
     { 
       // Aktif kullanıcının auth storage'ından ID'sini okuyarak her hesaba özel hafıza anahtarı üretiyoruz
-      name: `scoutfit-store-${(() => {
-        try {
-          const authData = localStorage.getItem("scoutfit-auth");
-          if (authData) {
-            const parsed = JSON.parse(authData);
-            return parsed?.state?.currentUser?.id || "guest";
-          }
-        } catch (e) {}
-        return "guest";
-      })()}` 
+     name: `scoutfit-store-${(() => {
+  try {
+    const authData = localStorage.getItem("scoutfit-auth");
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      return parsed?.state?.currentUser?.id || "guest";
+    }
+  } catch (e) {}
+  return "guest";
+})()}`
     },
   ),
 );

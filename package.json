@@ -12,6 +12,8 @@
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.1",
     "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/geolocation": "^8.2.4",
@@ -23,6 +25,7 @@
     "@tanstack/react-start": "latest",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.61.0",
     "react": "latest",
     "react-dom": "latest",
     "react-leaflet": "^5.0.0",

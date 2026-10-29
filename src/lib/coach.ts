@@ -1,4 +1,4 @@
-import { Capacitor, CapacitorHttp } from "@capacitor/core";
+import { sendAIChatRequest, AI_CONFIG, ChatMessage } from "@/services/ai/client";
 
 export function yerelKoc(soru: string, kalori: number): string {
   const q = soru.toLocaleLowerCase("tr-TR");
@@ -25,9 +25,6 @@ export async function kocSor({ data }: { data: KocGirdi }): Promise<{ ok: boolea
 
   if (!soru) return { ok: false, hata: "Soru boş bırakılamaz." };
 
-  const apiKey = "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";
-  const url = "https://api.groq.com/openai/v1/chat/completions";
-
   const sistemIcerik = `Sen ScoutFit profesyonel fitness koçusun.
 Kullanıcı Durumu: ${baglam || "Belirtilmedi"}.
 
@@ -36,76 +33,28 @@ KURALLAR:
 2. Kesinlikle EMOJİ KULLANMA.
 3. Sade, motive edici ve Türkçe yanıt ver.`;
 
-  const temizMesajlar: { role: "system" | "user" | "assistant"; content: string }[] = [
-    { role: "system", content: sistemIcerik },
-  ];
+  const messages: ChatMessage[] = [{ role: "system", content: sistemIcerik }];
 
   if (Array.isArray(data?.gecmis)) {
     for (const m of data.gecmis) {
-      if (m && typeof m.content === "string" && m.content.trim().length > 0) {
-        if (m.role === "user" || m.role === "assistant") {
-          temizMesajlar.push({ role: m.role, content: m.content.trim() });
-        }
+      if (m?.content?.trim()) {
+        messages.push({ role: m.role, content: m.content.trim() });
       }
     }
   }
 
-  temizMesajlar.push({ role: "user", content: soru });
-
-  // Groq'un güncel ve aktif üretim modeli
-  const payload = {
-    model: "openai/gpt-oss-120b",
-    temperature: 0.5,
-    max_tokens: 600,
-    messages: temizMesajlar,
-  };
-
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey.trim()}`,
-  };
+  messages.push({ role: "user", content: soru });
 
   try {
-    let rawText = "";
+    const metin = await sendAIChatRequest(messages, {
+      model: AI_CONFIG.models.coach,
+      temperature: 0.5,
+      maxTokens: 600,
+    });
 
-    if (Capacitor.isNativePlatform()) {
-      const res = await CapacitorHttp.post({
-        url,
-        headers,
-        data: payload,
-        connectTimeout: 20000,
-        readTimeout: 20000,
-      });
-
-      if (res.status !== 200) {
-        const errDetail = typeof res.data === "object" ? JSON.stringify(res.data) : String(res.data);
-        return { ok: false, hata: `Groq Hatası (${res.status}): ${errDetail.slice(0, 150)}` };
-      }
-
-      const d = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
-      rawText = d?.choices?.[0]?.message?.content?.trim() || "";
-    } else {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errDetail = await res.text();
-        return { ok: false, hata: `Web Hatası (${res.status}): ${errDetail.slice(0, 150)}` };
-      }
-
-      const d = await res.json();
-      rawText = d?.choices?.[0]?.message?.content?.trim() || "";
-    }
-
-    if (rawText) {
-      return { ok: true, metin: rawText };
-    }
-
+    if (metin) return { ok: true, metin };
     return { ok: false, hata: "Koç yanıt üretemedi." };
   } catch (err: any) {
-    return { ok: false, hata: `Bağlantı Hatası: ${err?.message || String(err)}` };
+    return { ok: false, hata: err?.message || "Bağlantı hatası oluştu." };
   }
 }
