@@ -4,12 +4,11 @@ import { Capacitor, CapacitorHttp } from "@capacitor/core";
 // TEK MERKEZİ YAPILANDIRMA: Sadece Burayı Değiş!
 // ==========================================
 export const AI_CONFIG = {
-  // Vercel'deki şifreyi alır, bulamazsa boş string döner (TypeScript hatasını önler)
-  apiKey: (import.meta.env.VITE_GROQ_API_KEY as string) || "", 
+  apiKey: "gsk_G0cvlFCXERbv9lkFEAIyWGdyb3FY9Rn45TrlT9iOX03V8mlMVua",
   baseUrl: "https://api.groq.com/openai/v1/chat/completions",
   models: {
-    coach: "openai/gpt-oss-20b",
-    food: "openai/gpt-oss-20b",
+    coach: "llama-3.3-70b-versatile",
+    food: "llama-3.3-70b-versatile",
   },
 };
 
