@@ -36,7 +36,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.47",
     "@types/leaflet": "^1.9.22",
-    "@types/node": "latest",
+    "@types/node": "^26.6.6",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "^6.1.2",
