@@ -1,10 +1,8 @@
-declare const process: { env: Record<string, string | undefined> };
 export const config = {
   runtime: 'edge',
 };
 
 export default async function handler(req: Request) {
-  // CORS Başlıkları
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -22,11 +20,11 @@ export default async function handler(req: Request) {
     });
   }
 
-  // Edge runtime ortamında process.env doğrudan okunabilir
+  // @ts-ignore
   const apiKey = (process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '').trim();
 
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Server GROQ_API_KEY bulunamadı!' }), {
+    return new Response(JSON.stringify({ error: 'Sunucuda GROQ_API_KEY bulunamadı' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -54,7 +52,7 @@ export default async function handler(req: Request) {
       },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message || 'AI Bağlantı Hatası' }), {
+    return new Response(JSON.stringify({ error: error.message || 'AI Proxy Hatası' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
