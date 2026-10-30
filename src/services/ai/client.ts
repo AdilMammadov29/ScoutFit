@@ -1,90 +1,69 @@
-import { Capacitor, CapacitorHttp } from "@capacitor/core";
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
 
-// ==========================================
-// TEK MERKEZİ YAPILANDIRMA: Sadece Burayı Değiş!
-// ==========================================
+export interface SendAIChatOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  max_tokens?: number;
+}
+
 export const AI_CONFIG = {
-  apiKey: "gsk_G0cvlFCXERbv9lkFEAIyWGdyb3FY9Rn45TrlT9iOX03V8mlMVua",
-  baseUrl: "https://api.groq.com/openai/v1/chat/completions",
+  baseUrl: "/api/chat",
   models: {
     coach: "llama-3.3-70b-versatile",
     food: "llama-3.3-70b-versatile",
   },
 };
 
-export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
-interface RequestOptions {
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
-
-/**
- * Hem Web hem Mobil (Capacitor) ortamında çalışan merkezi istek motoru
- */
 export async function sendAIChatRequest(
-  messages: ChatMessage[],
-  options: RequestOptions = {}
+  messages: ChatMessage[] | any[],
+  options?: SendAIChatOptions | string
 ): Promise<string> {
-  const model = options.model || AI_CONFIG.models.coach;
-  const temperature = options.temperature ?? 0.3;
-  const max_tokens = options.maxTokens ?? 1200;
+  const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
+  const baseUrl = isLocal ? "" : "https://scout-fit-1.vercel.app";
+  const targetUrl = `${baseUrl}/api/chat`;
 
-  // Şifre Vercel'den gelmezse hata fırlatıp çökmesini engeller
-  if (!AI_CONFIG.apiKey) {
-    console.warn("GROQ API Key bulunamadı! Lütfen Vercel 'Environment Variables' kısmına VITE_GROQ_API_KEY ekleyin.");
-    return "Yapay zeka koçu şu anda ayarlanamadı. Lütfen sistem yöneticisinin (Vercel) API anahtarını eklemesini bekleyin.";
+  let selectedModel = AI_CONFIG.models.coach;
+  let temperature = 0.7;
+  let maxTokens = 1024;
+
+  if (typeof options === "string") {
+    selectedModel = options;
+  } else if (options && typeof options === "object") {
+    if (options.model) selectedModel = options.model;
+    if (typeof options.temperature === "number") temperature = options.temperature;
+    if (typeof options.maxTokens === "number") maxTokens = options.maxTokens;
+    if (typeof options.max_tokens === "number") maxTokens = options.max_tokens;
   }
 
-  console.log("--> GROQ ISTEGI ATILIYOR | Model:", model, "| URL:", AI_CONFIG.baseUrl);
-
-  const payload = {
-    model,
-    temperature,
-    max_tokens,
-    messages,
-  };
-
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${AI_CONFIG.apiKey.trim()}`,
-  };
-
-  // Capacitor Mobil Ortamı
-  if (Capacitor.isNativePlatform()) {
-    const res = await CapacitorHttp.post({
-      url: AI_CONFIG.baseUrl,
-      headers,
-      data: payload,
-      connectTimeout: 20000,
-      readTimeout: 20000,
-    });
-
-    if (res.status !== 200) {
-      const detail = typeof res.data === "object" ? JSON.stringify(res.data) : String(res.data);
-      throw new Error(`Groq Mobil Hatası (${res.status}): ${detail}`);
-    }
-
-    const json = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
-    return json?.choices?.[0]?.message?.content?.trim() || "";
-  }
-
-  // Web / Vite Ortamı
-  const res = await fetch(AI_CONFIG.baseUrl, {
+  const response = await fetch(targetUrl, {
     method: "POST",
-    headers,
-    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: selectedModel,
+      messages: messages,
+      temperature: temperature,
+      max_tokens: maxTokens,
+    }),
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Groq Web Hatası (${res.status}): ${errorText}`);
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let parsedMessage = errorBody;
+    try {
+      const json = JSON.parse(errorBody);
+      parsedMessage = json.error?.message || json.error || errorBody;
+    } catch {
+      // ham metin kalır
+    }
+    throw new Error(`Groq AI Hatası (${response.status}): ${parsedMessage}`);
   }
 
-  const json = await res.json();
-  return json?.choices?.[0]?.message?.content?.trim() || "";
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
 }

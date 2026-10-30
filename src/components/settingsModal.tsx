@@ -13,8 +13,6 @@ import {
   Sliders,
   Smartphone,
   RotateCcw,
-  AlertCircle,
-  Check,
 } from "lucide-react";
 
 interface SettingsModalProps {
@@ -24,9 +22,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ acik, kapat }: SettingsModalProps) {
   const currentUser = useAuth((s: any) => s.currentUser);
-  
   const logout = useAuth((s: any) => s.logout);
-  
   const removeAccount = useAuth((s: any) => s.removeAccount);
 
   const birim = useEkstra((s: any) => s.birim);
@@ -43,6 +39,7 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
 
   const [sifirlaOnay, setSifirlaOnay] = useState(false);
   const [siliniyor, setSiliniyor] = useState(false);
+  const [cikisYapiliyor, setCikisYapiliyor] = useState(false);
 
   if (!acik) return null;
 
@@ -70,8 +67,6 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
       localStorage.removeItem("scoutfit_onboarding_done");
       localStorage.removeItem(`scoutfit_onboarding_${currentUser.id}`);
       localStorage.removeItem("scoutfit_activity_v3");
-      // Not: Supabase Auth kullanıcısını sunucu tarafında silmek gerekir (Edge Function).
-      // Şimdilik sadece veri ve oturum temizleniyor.
 
       removeAccount(currentUser.id);
       logout();
@@ -81,7 +76,7 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
       }
 
       kapat();
-      window.location.reload();
+      window.location.href = "/";
     } catch (err) {
       console.error("Hesap silinirken hata oluştu:", err);
       alert("Hesap silinirken bir sorun oluştu.");
@@ -101,12 +96,47 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
   };
 
   const handleCikis = async () => {
-    let sonuc = await cikisYap();
-    if (sonuc === "kaydedilemedi") {
-      if (!window.confirm("Son değişiklikler buluta kaydedilemedi. Yine de çıkılsın mı?")) return;
-      await cikisYap(true);
+    setCikisYapiliyor(true);
+    try {
+      // 1. Bulut senkronizasyonunu sonlandır
+      try {
+        const sonuc = await cikisYap();
+        if (sonuc === "kaydedilemedi") {
+          const devam = window.confirm("Son değişiklikler buluta kaydedilemedi. Yine de çıkılsın mı?");
+          if (!devam) {
+            setCikisYapiliyor(false);
+            return;
+          }
+          await cikisYap(true);
+        }
+      } catch (syncErr) {
+        console.warn("Sync çıkış uyarısı:", syncErr);
+      }
+
+      // 2. Zustand auth durumunu sıfırla
+      if (typeof logout === "function") {
+        logout();
+      }
+
+      // 3. Supabase oturumunu kalıcı olarak kapat
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+
+      // 4. Oturumu tarayıcıda tutan tüm kayıtları temizle
+      localStorage.removeItem("sb-access-token");
+      localStorage.removeItem("sb-refresh-token");
+      sessionStorage.clear();
+
+      kapat();
+      // 5. Giriş ekranına kesin yönlendirme
+      window.location.href = "/";
+    } catch (err) {
+      console.error("Çıkış hatası:", err);
+      window.location.href = "/";
+    } finally {
+      setCikisYapiliyor(false);
     }
-    window.location.reload(); // bellekteki tüm store'ları sıfırlar
   };
 
   return (
@@ -148,22 +178,22 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
               </div>
             )}
 
-
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
+                disabled={cikisYapiliyor}
                 onClick={handleCikis}
-                className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-line bg-paper px-3.5 py-2 text-[13px] font-medium text-ink hover:border-muted/40 transition-colors"
+                className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-line bg-paper px-3.5 py-2 text-[13px] font-medium text-ink hover:border-muted/40 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <LogOut className="w-4 h-4 text-muted" />
-                <span>Çıkış Yap / Değiştir</span>
+                <span>{cikisYapiliyor ? "Çıkış Yapılıyor..." : "Çıkış Yap / Değiştir"}</span>
               </button>
               {currentUser && (
                 <button
                   type="button"
-                  disabled={siliniyor}
+                  disabled={siliniyor || cikisYapiliyor}
                   onClick={handleHesapSil}
-                  className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-clay/30 bg-clay/5 px-3.5 py-2 text-[13px] font-medium text-clay hover:bg-clay/10 transition-colors disabled:opacity-50"
+                  className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-clay/30 bg-clay/5 px-3.5 py-2 text-[13px] font-medium text-clay hover:bg-clay/10 transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>{siliniyor ? "Siliniyor..." : "Hesabı Sil"}</span>
@@ -250,7 +280,6 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
             </div>
 
             <div className="space-y-2">
-
               <div className="flex items-center justify-between rounded-xl border border-line bg-paper/60 p-3">
                 <div>
                   <p className="text-[13px] font-medium text-ink">Sesli Geri Bildirim</p>
