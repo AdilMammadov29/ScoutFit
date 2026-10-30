@@ -22,8 +22,9 @@ export async function sendAIChatRequest(
   messages: ChatMessage[] | any[],
   options?: SendAIChatOptions | string
 ): Promise<string> {
+  // Canlıda /api/chat yoluna gider
   const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
-  const baseUrl = isLocal ? "" : "https://scout-fit-1.vercel.app";
+  const baseUrl = isLocal ? "" : window.location.origin;
   const targetUrl = `${baseUrl}/api/chat`;
 
   let selectedModel = AI_CONFIG.models.coach;
@@ -61,7 +62,7 @@ export async function sendAIChatRequest(
     } catch {
       // ham metin kalır
     }
-    throw new Error(`Groq AI Hatası (${response.status}): ${parsedMessage}`);
+    throw new Error(`AI Hatası (${response.status}): ${parsedMessage}`);
   }
 
   const data = await response.json();
