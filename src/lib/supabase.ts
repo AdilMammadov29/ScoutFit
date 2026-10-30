@@ -1,10 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
-const adres = String(import.meta.env.VITE_SUPABASE_URL ?? "").trim();
-const anahtar = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
+// Supabase bilgilerini doğrudan buraya ekliyoruz:
+const adres = "https://bxccqrncfqbelcqeqogw.supabase.co"; 
+const anahtar = "sb_publishable_pZiAyqCod_AEhME4vgke-g_B8z16rGX"; // Az önceki ekrandan kopyaladığın uzun anahtar
 
 export const supabaseHazir = Boolean(adres && anahtar);
 
-export const supabase = createClient(adres || "https://yok.invalid", anahtar || "yok", {
+export const supabase = createClient(adres, anahtar, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });

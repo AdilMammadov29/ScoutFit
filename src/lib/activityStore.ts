@@ -35,6 +35,7 @@ export interface ActivityState {
   antrenmanBaslat: (bolge: string) => void;
   antrenmanBitir: () => { sureDk: number; adim: number; mesafeKm: number; bolge: string } | null;
   antrenmanIptal: () => void;
+  gunKontrol: () => void;
   istatistikleriGetir: () => {
     gunlukAdim: number;
     gunlukKm: string;
@@ -63,22 +64,45 @@ function verileriYukle() {
   }
 }
 
+const GUN_ADLARI = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+
 export const useActivity = create<ActivityState>((set, get) => {
   const yuklenen = verileriYukle();
-  const bugunStr = yerelTarih();
+  let bugunStr = yerelTarih();
 
-  const baslangicSu = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunSuMl ?? 0) : 0;
-  const baslangicAdim = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunAdim ?? 0) : 0;
-  const baslangicUyku = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunUykuSaat ?? null) : null;
+  // Gün değiştiyse önceki günü arşivle
+  let baslangicSu = 0;
+  let baslangicAdim = 0;
+  let baslangicUyku: number | null = null;
+  let gecmis: GunlukAktivite[] = yuklenen?.haftalikGecmis ?? [];
+
+  if (yuklenen) {
+    if (yuklenen.sonTarih === bugunStr) {
+      baslangicSu = yuklenen.bugunSuMl ?? 0;
+      baslangicAdim = yuklenen.bugunAdim ?? 0;
+      baslangicUyku = yuklenen.bugunUykuSaat ?? null;
+    } else if (yuklenen.sonTarih) {
+      // Dünün verisini geçmişe ekle
+      const eskiKayit: GunlukAktivite = {
+        tarih: yuklenen.sonTarih,
+        adim: yuklenen.bugunAdim ?? 0,
+        suMl: yuklenen.bugunSuMl ?? 0,
+        uykuSaat: yuklenen.bugunUykuSaat ?? null,
+      };
+      gecmis = [eskiKayit, ...gecmis.filter((g: GunlukAktivite) => g.tarih !== yuklenen.sonTarih)].slice(0, 60);
+    }
+  }
+
   const favoriler = yuklenen?.favoriKaplar ?? [250, 330, 500, 750];
   const baslangicAntrenman = yuklenen?.aktifAntrenman ?? null;
 
-  const kaydetLocal = (yeni: Partial<ActivityState>) => {
+  const kaydetLocal = (yeni: Partial<ActivityState> & { sonTarih?: string }) => {
     const s = get();
+    const tarih = yerelTarih();
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        sonTarih: bugunStr,
+        sonTarih: tarih,
         bugunSuMl: yeni.bugunSuMl ?? s.bugunSuMl,
         bugunAdim: yeni.bugunAdim ?? s.bugunAdim,
         bugunUykuSaat: yeni.bugunUykuSaat !== undefined ? yeni.bugunUykuSaat : s.bugunUykuSaat,
@@ -96,10 +120,35 @@ export const useActivity = create<ActivityState>((set, get) => {
     hedefSuMl: 2500,
     bugunUykuSaat: baslangicUyku,
     favoriKaplar: favoriler,
-    haftalikGecmis: yuklenen?.haftalikGecmis ?? [],
+    haftalikGecmis: gecmis,
     aktifAntrenman: baslangicAntrenman,
 
+    gunKontrol: () => {
+      const yeniTarih = yerelTarih();
+      const s = get();
+      // localStorage'dan son tarihi oku
+      const raw = verileriYukle();
+      const sonTarih = raw?.sonTarih;
+      if (sonTarih && sonTarih !== yeniTarih) {
+        const eskiKayit: GunlukAktivite = {
+          tarih: sonTarih,
+          adim: s.bugunAdim,
+          suMl: s.bugunSuMl,
+          uykuSaat: s.bugunUykuSaat,
+        };
+        const yeniGecmis = [eskiKayit, ...s.haftalikGecmis.filter((g) => g.tarih !== sonTarih)].slice(0, 60);
+        set({
+          bugunAdim: 0,
+          bugunSuMl: 0,
+          bugunUykuSaat: null,
+          haftalikGecmis: yeniGecmis,
+        });
+        kaydetLocal({ bugunAdim: 0, bugunSuMl: 0, bugunUykuSaat: null });
+      }
+    },
+
     suEkle: (ml: number) => {
+      get().gunKontrol();
       const oncekiSu = get().bugunSuMl;
       const yeniSu = oncekiSu + ml;
       const hedef = get().hedefSuMl;
@@ -135,6 +184,7 @@ export const useActivity = create<ActivityState>((set, get) => {
     },
 
     adimGuncelle: (adim: number) => {
+      get().gunKontrol();
       const oncekiAdim = get().bugunAdim;
       const hedef = get().hedefAdim;
 
@@ -151,6 +201,7 @@ export const useActivity = create<ActivityState>((set, get) => {
     },
 
     uykuGuncelle: (saat: number) => {
+      get().gunKontrol();
       set({ bugunUykuSaat: saat });
       kaydetLocal({ bugunUykuSaat: saat });
     },
@@ -173,10 +224,11 @@ export const useActivity = create<ActivityState>((set, get) => {
 
       const suAn = Date.now();
       const sureMs = Math.max(0, suAn - aktifAntrenman.baslangicZamani);
+      // 1 dakikadan kısa antrenmanları gerçek süreyle kaydet (en az 1 dk değil)
       const sureDk = Math.max(1, Math.round(sureMs / 60000));
 
       let netAdim = bugunAdim - aktifAntrenman.baslangicAdim;
-      if (netAdim < 0) netAdim = bugunAdim; // Gece yarısı gün devri veya sıfırlanma toleransı
+      if (netAdim < 0) netAdim = 0; // Gece yarısı sıfırlanmasında antrenman adımını 0 say
 
       const mesafeKm = Number(((netAdim * 0.75) / 1000).toFixed(2));
       const sonuc = {
@@ -197,24 +249,45 @@ export const useActivity = create<ActivityState>((set, get) => {
     },
 
     istatistikleriGetir: () => {
-      const { bugunAdim } = get();
+      const { bugunAdim, haftalikGecmis } = get();
+      const bugun = yerelTarih();
       const gunlukKm = ((bugunAdim * 0.75) / 1000).toFixed(1);
+
+      // Son 7 gün (bugün dahil)
+      const yediGunOnce = new Date();
+      yediGunOnce.setDate(yediGunOnce.getDate() - 6);
+      const yediGunStr = `${yediGunOnce.getFullYear()}-${String(yediGunOnce.getMonth() + 1).padStart(2, "0")}-${String(yediGunOnce.getDate()).padStart(2, "0")}`;
+
+      const gecmisMap = new Map(haftalikGecmis.map((g) => [g.tarih, g.adim]));
+      gecmisMap.set(bugun, bugunAdim);
+
+      let haftalikAdim = 0;
+      const haftalikGunler: { gun: string; adim: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const adim = gecmisMap.get(t) ?? 0;
+        haftalikAdim += adim;
+        haftalikGunler.push({ gun: GUN_ADLARI[d.getDay()], adim });
+      }
+
+      // Son 30 gün
+      let aylikAdim = bugunAdim;
+      for (const g of haftalikGecmis) {
+        const d = new Date(g.tarih + "T12:00:00");
+        const fark = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+        if (fark <= 30 && g.tarih !== bugun) aylikAdim += g.adim;
+      }
+
       return {
         gunlukAdim: bugunAdim,
         gunlukKm,
-        haftalikAdim: bugunAdim,
-        haftalikKm: gunlukKm,
-        aylikAdim: bugunAdim,
-        aylikKm: gunlukKm,
-        haftalikGunler: [
-          { gun: "Pzt", adim: 6500 },
-          { gun: "Sal", adim: 8200 },
-          { gun: "Çar", adim: 7100 },
-          { gun: "Per", adim: 9400 },
-          { gun: "Cum", adim: bugunAdim },
-          { gun: "Cmt", adim: 0 },
-          { gun: "Paz", adim: 0 },
-        ],
+        haftalikAdim,
+        haftalikKm: ((haftalikAdim * 0.75) / 1000).toFixed(1),
+        aylikAdim,
+        aylikKm: ((aylikAdim * 0.75) / 1000).toFixed(1),
+        haftalikGunler,
       };
     },
   };

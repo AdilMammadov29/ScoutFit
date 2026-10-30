@@ -3,12 +3,11 @@ import { useAuth } from "../lib/authStore";
 import { useEkstra } from "../lib/extras";
 import { useFit } from "../lib/store";
 import { useSettingsStore } from "../lib/settingsStore";
-import { tumVeriyiSifirla } from "@/lib/sync";
+import { tumVeriyiSifirla, cikisYap } from "@/lib/sync";
 import { supabase } from "../lib/supabase";
 import {
   X,
   User,
-  Users,
   LogOut,
   Trash2,
   Sliders,
@@ -25,9 +24,9 @@ interface SettingsModalProps {
 
 export function SettingsModal({ acik, kapat }: SettingsModalProps) {
   const currentUser = useAuth((s: any) => s.currentUser);
-  const accounts = useAuth((s: any) => s.accounts);
+  
   const logout = useAuth((s: any) => s.logout);
-  const switchAccount = useAuth((s: any) => s.switchAccount);
+  
   const removeAccount = useAuth((s: any) => s.removeAccount);
 
   const birim = useEkstra((s: any) => s.birim);
@@ -69,6 +68,10 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
 
       localStorage.removeItem(`scoutfit-store-${currentUser.id}`);
       localStorage.removeItem("scoutfit_onboarding_done");
+      localStorage.removeItem(`scoutfit_onboarding_${currentUser.id}`);
+      localStorage.removeItem("scoutfit_activity_v3");
+      // Not: Supabase Auth kullanıcısını sunucu tarafında silmek gerekir (Edge Function).
+      // Şimdilik sadece veri ve oturum temizleniyor.
 
       removeAccount(currentUser.id);
       logout();
@@ -95,6 +98,15 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
     } else {
       setSifirlaOnay(true);
     }
+  };
+
+  const handleCikis = async () => {
+    let sonuc = await cikisYap();
+    if (sonuc === "kaydedilemedi") {
+      if (!window.confirm("Son değişiklikler buluta kaydedilemedi. Yine de çıkılsın mı?")) return;
+      await cikisYap(true);
+    }
+    window.location.reload(); // bellekteki tüm store'ları sıfırlar
   };
 
   return (
@@ -136,36 +148,11 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
               </div>
             )}
 
-            {accounts && accounts.length > 1 && (
-              <div className="mb-3 space-y-2">
-                <p className="text-[12px] text-muted flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Kayıtlı Diğer Hesaplar</span>
-                </p>
-                {accounts
-                  .filter((a: any) => a.id !== currentUser?.id)
-                  .map((acc: any) => (
-                    <div
-                      key={acc.id}
-                      className="flex items-center justify-between rounded-xl border border-line bg-paper px-3.5 py-2.5"
-                    >
-                      <span className="text-[13px] font-medium text-ink">{acc.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => switchAccount(acc.id)}
-                        className="text-[13px] font-medium text-pine hover:underline"
-                      >
-                        Geçiş Yap
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
 
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => logout()}
+                onClick={handleCikis}
                 className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-line bg-paper px-3.5 py-2 text-[13px] font-medium text-ink hover:border-muted/40 transition-colors"
               >
                 <LogOut className="w-4 h-4 text-muted" />
@@ -263,23 +250,6 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-xl border border-line bg-paper/60 p-3">
-                <div>
-                  <p className="text-[13px] font-medium text-ink">Canlı Rota Çizgisi</p>
-                  <p className="text-[11px] text-muted">Haritada kat ettiğin yolu anlık göster</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => updateSetting("livePolyline", !settings.livePolyline)}
-                  className={`min-h-[36px] min-w-[72px] rounded-lg text-[12px] font-medium transition-colors ${
-                    settings.livePolyline
-                      ? "bg-pine text-paper"
-                      : "border border-line bg-paper text-muted"
-                  }`}
-                >
-                  {settings.livePolyline ? "Açık" : "Kapalı"}
-                </button>
-              </div>
 
               <div className="flex items-center justify-between rounded-xl border border-line bg-paper/60 p-3">
                 <div>
@@ -314,24 +284,6 @@ export function SettingsModal({ acik, kapat }: SettingsModalProps) {
                   }`}
                 >
                   {settings.haptics ? "Açık" : "Kapalı"}
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-line bg-paper/60 p-3">
-                <div>
-                  <p className="text-[13px] font-medium text-ink">Çevrimdışı Kayıt</p>
-                  <p className="text-[11px] text-muted">İnternet koptuğunda rotayı cihazda sakla</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => updateSetting("offlineSync", !settings.offlineSync)}
-                  className={`min-h-[36px] min-w-[72px] rounded-lg text-[12px] font-medium transition-colors ${
-                    settings.offlineSync
-                      ? "bg-pine text-paper"
-                      : "border border-line bg-paper text-muted"
-                  }`}
-                >
-                  {settings.offlineSync ? "Açık" : "Kapalı"}
                 </button>
               </div>
             </div>

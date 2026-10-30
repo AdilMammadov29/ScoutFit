@@ -92,9 +92,10 @@ function TakipEkrani() {
   const anlikMesafeKm = Number(((anlikAdim * adimBoyuMetre) / 1000).toFixed(2));
   
   // Kalori Hesaplaması
+  // Yürüyüş için yaklaşık MET tabanlı: km × kilo × 0.6
   const anlikKalori = profil?.kilo 
-    ? Math.round(anlikMesafeKm * profil.kilo) 
-    : Math.round(anlikAdim * 0.045);
+    ? Math.round(anlikMesafeKm * profil.kilo * 0.6) 
+    : Math.round(anlikAdim * 0.04);
 
   const handleBitir = () => {
     if (!aktifAntrenman) return;
@@ -111,7 +112,7 @@ function TakipEkrani() {
       ekle({
         bolge: sonuc.bolge,
         hareketler: `Pedometre Takibi: ${sonuc.adim.toLocaleString("tr-TR")} adım · ${sonuc.mesafeKm} km · ${anlikKalori} kcal`,
-        sureDk: Math.min(240, Math.max(5, sonuc.sureDk)),
+        sureDk: Math.min(240, Math.max(1, sonuc.sureDk)),
       });
     }
   };

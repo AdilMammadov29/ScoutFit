@@ -17,7 +17,6 @@ export type Mesaj = {
   yerel?: boolean;
 };
 
-// --- YENİ EKLENEN ÖĞÜN TİPİ ---
 export type Ogun = {
   id: string;
   isim: string;
@@ -45,6 +44,7 @@ type FitState = {
   temizleSohbet: () => void;
   ekleOgun: (isim: string, kalori: number) => void;
   silOgun: (id: string) => void;
+  sifirla: () => void;
 };
 
 function damgala(taslak: Taslak): Antrenman {
@@ -53,6 +53,32 @@ function damgala(taslak: Taslak): Antrenman {
     id: crypto.randomUUID(),
     tarih: new Date().toISOString(),
   };
+}
+
+function storeName(): string {
+  try {
+    const key = Object.keys(localStorage).find(
+      (k) => k.startsWith("sb-") && k.endsWith("-auth-token")
+    );
+    if (key) {
+      const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+      const uid = parsed?.user?.id || parsed?.currentSession?.user?.id;
+      if (uid) return `scoutfit-store-${uid}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const authData = localStorage.getItem("scoutfit-auth");
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      const id = parsed?.state?.currentUser?.id;
+      if (id) return `scoutfit-store-${id}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return "scoutfit-store-guest";
 }
 
 export const useFit = create<FitState>()(
@@ -65,11 +91,11 @@ export const useFit = create<FitState>()(
       kaydetProfil: (profil) => set({ profil }),
       ekleAntrenman: (taslak) =>
         set((s) => ({
-          antrenmanlar: [damgala(taslak), ...s.antrenmanlar].slice(0, 40),
+          antrenmanlar: [damgala(taslak), ...s.antrenmanlar].slice(0, 80),
         })),
       ekleProgram: (gunler) =>
         set((s) => ({
-          antrenmanlar: [...gunler.map(damgala), ...s.antrenmanlar].slice(0, 40),
+          antrenmanlar: [...gunler.map(damgala), ...s.antrenmanlar].slice(0, 80),
         })),
       silAntrenman: (id) =>
         set((s) => ({
@@ -78,7 +104,7 @@ export const useFit = create<FitState>()(
       temizleAntrenman: () => set({ antrenmanlar: [] }),
       ekleMesaj: (mesaj) =>
         set((s) => ({
-          sohbet: [...s.sohbet, mesaj].slice(-24),
+          sohbet: [...s.sohbet, mesaj].slice(-40),
         })),
       temizleSohbet: () => set({ sohbet: [] }),
       ekleOgun: (isim, kalori) =>
@@ -92,18 +118,11 @@ export const useFit = create<FitState>()(
         set((s) => ({
           ogunler: s.ogunler.filter((o) => o.id !== id),
         })),
+      sifirla: () =>
+        set({ profil: null, antrenmanlar: [], sohbet: [], ogunler: [] }),
     }),
     {
-      name: `scoutfit-store-${(() => {
-        try {
-          const authData = localStorage.getItem("scoutfit-auth");
-          if (authData) {
-            const parsed = JSON.parse(authData);
-            return parsed?.state?.currentUser?.id || "guest";
-          }
-        } catch (e) {}
-        return "guest";
-      })()}`,
-    },
-  ),
+      name: storeName(),
+    }
+  )
 );

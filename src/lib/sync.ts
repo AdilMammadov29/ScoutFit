@@ -47,10 +47,31 @@ function paketUygula(p: Partial<Paket>) {
 }
 
 function bosVeri() {
-  useFit.setState({ profil: null, antrenmanlar: [], sohbet: [] });
+  const fit = useFit.getState() as any;
+  if (typeof fit.sifirla === "function") fit.sifirla();
+  else useFit.setState({ profil: null, antrenmanlar: [], sohbet: [], ogunler: [] });
+
   useEkstra.setState({ ad: "", birim: "kg", kiloKayitlari: [] });
   useEkstra.getState().setTema("acik");
-  useOgun.setState({ ogunler: [] });
+
+  const ogun = useOgun.getState() as any;
+  if (typeof ogun.sifirla === "function") ogun.sifirla();
+  else useOgun.setState({ ogunler: [] });
+
+  // Kullanıcıya özel olmayan yedek anahtarları da temizle
+  try {
+    [
+      "scoutfit_meals_v2",
+      "scoutfit_activity_v3",
+      "scoutfit_diet_streak_v3",
+      "scoutfit_notifications_v1",
+      "scoutfit-ogunler",
+      "scoutfit-store-guest",
+      "scoutfit-ogunler-guest",
+    ].forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
 }
 
 let aktifKullanici: string | null = null;
@@ -122,6 +143,8 @@ export async function bulutaBaglan(kullaniciId: string): Promise<void> {
       paketUygula(kayitli);
       sonGonderilen = JSON.stringify(anlikPaket());
     } else {
+      // Yeni hesapta önceki kullanıcının cihaz verisini yükleme — sıfırla
+      bosVeri();
       sonGonderilen = "";
       await kuyrugaAl();
       if (benim !== nesil) return;

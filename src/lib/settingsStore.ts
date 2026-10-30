@@ -23,13 +23,13 @@ const DEFAULT_SETTINGS: UserSettings = {
 
 export const useSettingsStore = create<SettingsState>((set) => {
   const saved = typeof window !== 'undefined' ? localStorage.getItem('scoutfit_settings') : null;
-  const initialSettings = saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-
-  if (typeof document !== 'undefined') {
-    if (initialSettings.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  let initialSettings = DEFAULT_SETTINGS;
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      initialSettings = { ...DEFAULT_SETTINGS, ...parsed };
+    } catch {
+      /* ignore */
     }
   }
 
@@ -41,15 +41,6 @@ export const useSettingsStore = create<SettingsState>((set) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('scoutfit_settings', JSON.stringify(updated));
         }
-
-        if (key === 'theme' && typeof document !== 'undefined') {
-          if (value === 'dark') {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
-        }
-
         return { settings: updated };
       });
     },

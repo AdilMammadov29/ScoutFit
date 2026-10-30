@@ -11,12 +11,12 @@ const config: CapacitorConfig = {
   },
   server: {
     androidScheme: 'https',
-    cleartext: true,
+    // cleartext: true, // yalnızca geliştirme
   },
   android: {
-    allowMixedContent: true,
+    // allowMixedContent: true, // yalnızca geliştirme
     captureInput: true,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false, // yayında kapalı
   },
 };
 

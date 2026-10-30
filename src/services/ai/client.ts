@@ -33,7 +33,7 @@ export async function sendAIChatRequest(
 ): Promise<string> {
   const model = options.model || AI_CONFIG.models.coach;
   const temperature = options.temperature ?? 0.3;
-  const max_tokens = options.maxTokens ?? 600;
+  const max_tokens = options.maxTokens ?? 1200;
 
   // Şifre Vercel'den gelmezse hata fırlatıp çökmesini engeller
   if (!AI_CONFIG.apiKey) {

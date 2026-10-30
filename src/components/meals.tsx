@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { yemekAnalizEt } from "@/lib/yemek";
+import { useOgun } from "@/lib/ogun";
 import type { Section } from "./shell";
 import {
   Camera,
@@ -31,17 +32,39 @@ interface TarananUrunBilgi {
   fat100: number;
 }
 
-const STORAGE_KEY = "scoutfit_meals_v2";
-
 export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
-  const [ogunler, setOgunler] = useState<BesinOgun[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  const hamOgunler = useOgun((s) => s.ogunler);
+  const ekleOgunler = useOgun((s) => s.ekleOgunler);
+  const silOgun = useOgun((s) => s.silOgun);
+
+  // useOgun formatını UI formatına çevir
+  const ogunler: BesinOgun[] = useMemo(
+    () =>
+      hamOgunler.map((o) => ({
+        id: o.id,
+        ad: o.isim,
+        kalori: o.kalori,
+        protein: o.protein ?? 0,
+        karb: o.karb ?? 0,
+        yag: o.yag ?? 0,
+        ogunTipi: o.ogunTipi ?? "Ara Öğün",
+      })),
+    [hamOgunler]
+  );
+
+  const ogunEkle = (item: Omit<BesinOgun, "id">) => {
+    ekleOgunler([
+      {
+        tarih: new Date().toISOString(),
+        isim: item.ad,
+        kalori: item.kalori,
+        protein: item.protein,
+        karb: item.karb,
+        yag: item.yag,
+        ogunTipi: item.ogunTipi,
+      },
+    ]);
+  };
 
   const [yeniAd, setYeniAd] = useState("");
   const [yeniKalori, setYeniKalori] = useState("");
@@ -65,9 +88,6 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
   const [tarananUrun, setTarananUrun] = useState<TarananUrunBilgi | null>(null);
   const [girilenGram, setGirilenGram] = useState<number>(100);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ogunler));
-  }, [ogunler]);
 
   // Kamerayı güvenli şekilde kapat
   const kamerayiDurdur = () => {
@@ -233,8 +253,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
     const hesaplananCarb = Math.round(tarananUrun.carb100 * oran);
     const hesaplananFat = Math.round(tarananUrun.fat100 * oran);
 
-    const yeniOgun: BesinOgun = {
-      id: Date.now().toString(),
+    const yeniOgun: Omit<BesinOgun, "id"> = {
       ad: `${tarananUrun.ad} (${girilenGram}g)`,
       kalori: hesaplananCal,
       protein: hesaplananProt,
@@ -243,7 +262,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
       ogunTipi,
     };
 
-    setOgunler((prev) => [yeniOgun, ...prev]);
+    ogunEkle(yeniOgun);
     setAiMesaj(`Eklendi: ${yeniOgun.ad} · ${hesaplananCal} kcal`);
     setTarananUrun(null);
   };
@@ -258,8 +277,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
     try {
       const sonuc = await yemekAnalizEt(yemekMetni);
 
-      const yeniOgun: BesinOgun = {
-        id: Date.now().toString(),
+      const yeniOgun: Omit<BesinOgun, "id"> = {
         ad: sonuc.ad || yemekMetni,
         kalori: Number(sonuc.kalori) || 0,
         protein: Number(sonuc.protein) || 0,
@@ -268,7 +286,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
         ogunTipi,
       };
 
-      setOgunler((prev) => [yeniOgun, ...prev]);
+      ogunEkle(yeniOgun);
       setAiGirdi("");
       setAiMesaj(
         `Eklendi: ${yeniOgun.ad} (${yeniOgun.kalori} kcal · P ${yeniOgun.protein}g · K ${yeniOgun.karb}g · Y ${yeniOgun.yag}g)`
@@ -289,8 +307,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
     e.preventDefault();
     if (!yeniAd.trim() || !yeniKalori) return;
 
-    const yeni: BesinOgun = {
-      id: Date.now().toString(),
+    const yeni: Omit<BesinOgun, "id"> = {
       ad: yeniAd.trim(),
       kalori: Number(yeniKalori) || 0,
       protein: Number(yeniProtein) || 0,
@@ -299,7 +316,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
       ogunTipi,
     };
 
-    setOgunler([yeni, ...ogunler]);
+    ogunEkle(yeni);
     setYeniAd("");
     setYeniKalori("");
     setYeniProtein("");
@@ -505,7 +522,7 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setOgunler(ogunler.filter((o) => o.id !== item.id))}
+                  onClick={() => silOgun(item.id)}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-clay hover:bg-paper transition-colors"
                   aria-label="Öğünü sil"
                 >

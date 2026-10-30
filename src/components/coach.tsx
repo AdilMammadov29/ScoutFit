@@ -29,19 +29,30 @@ const HIZLI_SORULAR = [
 export function CoachView() {
   const profil = useFit((s) => s.profil);
   const antrenmanlar = useFit((s) => s.antrenmanlar);
+  const sohbet = useFit((s) => s.sohbet);
+  const ekleMesaj = useFit((s) => s.ekleMesaj);
   const h = profil ? profildenHesap(profil) : null;
 
   const { bugunSuMl, hedefSuMl, bugunAdim, istatistikleriGetir } = useActivity();
   const { kayitlar, seri, kacamakNedeni, kacamakNotu } = useDiet();
 
-  const [mesajlar, setMesajlar] = useState<Mesaj[]>([
-    {
-      id: "ilk-karsilama",
-      gonderen: "koc",
-      metin: "Selam! Ben ScoutFit Koçun. Antrenmanların, beslenme disiplinin ve haftalık verilerin aklımda. Aklına gelen her şeyi sorabilirsin.",
-      zaman: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    },
-  ]);
+  // Store sohbetini UI formatına çevir; boşsa karşılama göster
+  const karsilama: Mesaj = {
+    id: "ilk-karsilama",
+    gonderen: "koc",
+    metin: "Selam! Ben ScoutFit Koçun. Antrenmanların, beslenme disiplinin ve haftalık verilerin aklımda. Aklına gelen her şeyi sorabilirsin.",
+    zaman: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
+  const mesajlar: Mesaj[] =
+    sohbet.length === 0
+      ? [karsilama]
+      : sohbet.map((m) => ({
+          id: m.id,
+          gonderen: m.rol === "kullanici" ? "kullanici" : "koc",
+          metin: m.metin,
+          zaman: "",
+        }));
+
   const [soru, setSoru] = useState("");
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -124,7 +135,7 @@ export function CoachView() {
         content: m.metin,
       }));
 
-    setMesajlar((onceki) => [...onceki, yeniKullaniciMesaji]);
+    ekleMesaj({ id: yeniKullaniciMesaji.id, rol: "kullanici", metin: s });
     setSoru("");
     setYukleniyor(true);
     setHata(null);
@@ -165,7 +176,7 @@ export function CoachView() {
           metin: res.metin,
           zaman: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
-        setMesajlar((onceki) => [...onceki, koctanGelen]);
+        ekleMesaj({ id: koctanGelen.id, rol: "koc", metin: res.metin });
       } else {
         setHata(res.hata || "Koç şu an yanıt veremiyor.");
       }
