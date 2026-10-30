@@ -3,7 +3,7 @@ import { sendAIChatRequest, AI_CONFIG, ChatMessage } from "@/services/ai/client"
 export function yerelKoc(soru: string, kalori: number): string {
   const q = soru.toLocaleLowerCase("tr-TR");
   if (["naber", "merhaba", "selam", "hey", "nasılsın", "iyi günler"].some((k) => q.includes(k))) {
-    return `Merhaba. Günlük hedefin ${kalori} kcal. Antrenman, öğün ya da tempo — hangisini açalım?`;
+    return `Merhaba! Günlük hedefin ${kalori} kcal. Antrenman, öğün ya da tempo — hangisini konuşalım?`;
   }
   return `${kalori} kcal hedefini bozmadan sorunu antrenman ya da öğün olarak netleştirirsen daha kısa cevap veririm. Neyi değiştirmek istiyorsun?`;
 }
@@ -25,13 +25,15 @@ export async function kocSor({ data }: { data: KocGirdi }): Promise<{ ok: boolea
 
   if (!soru) return { ok: false, hata: "Soru boş bırakılamaz." };
 
-  const sistemIcerik = `Sen ScoutFit profesyonel fitness koçusun.
-Kullanıcı Durumu: ${baglam || "Belirtilmedi"}.
+  const sistemIcerik = `Sen ScoutFit uygulamasının kişisel antrenman ve beslenme koçusun.
+Kullanıcı durumu: ${baglam || "Belirtilmedi"}.
 
-KURALLAR:
-1. Selamlama kalıpları (Merhaba, Selam) kullanma, doğrudan soruya cevap ver.
-2. Kesinlikle EMOJİ KULLANMA.
-3. Sade, motive edici ve Türkçe yanıt ver.`;
+Kurallar:
+- Samimi, kısa ve net Türkçe konuş.
+- Konuyu dağıtma, her zaman yardımcı ol.
+- Sadece antrenman, beslenme, motivasyon ve sağlık konularında cevap ver.
+- Kullanıcı "naber", "merhaba", "selam" gibi bir şey derse doğal ve samimi karşılık ver.
+- Gereksiz uzun konuşma yapma.`;
 
   const messages: ChatMessage[] = [{ role: "system", content: sistemIcerik }];
 

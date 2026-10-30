@@ -4,6 +4,13 @@ import { profildenHesap } from "../lib/engine";
 import { useFit } from "../lib/store";
 import { useActivity } from "../lib/activityStore";
 import { useDiet } from "../lib/nutritionStore";
+import {
+  Mic,
+  ArrowUp,
+  AlertCircle,
+  Copy,
+  Check,
+} from "lucide-react";
 
 interface Mesaj {
   id: string;
@@ -182,32 +189,22 @@ export function CoachView() {
     setTimeout(() => setKopyalananId(null), 2000);
   };
 
-  return (
-    <div className="mx-auto flex h-[calc(100vh-140px)] max-w-3xl flex-col space-y-4">
-      {/* Üst Başlık & AI Rozeti */}
-      <div className="flex flex-col gap-3 border-b border-line/40 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">04</span>
-            <span className="text-muted/40">•</span>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-ink">ScoutFit AI Koç</h1>
-          </div>
-          <p className="mt-1 text-xs text-muted">
-            Haftalık antrenman, su ve kaçamak verilerin bağlama eklendi.
-          </p>
-        </div>
+  const sadeceKarsilamaVar = mesajlar.length === 1 && mesajlar[0].id === "ilk-karsilama";
 
-        <div className="inline-flex items-center gap-2 self-start rounded-full border border-pine/30 bg-pine/10 px-3 py-1 text-xs font-medium text-pine">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pine opacity-75"></span>
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-pine"></span>
-          </span>
-          Groq AI Aktif
+  return (
+    <div className="mx-auto flex h-[calc(100vh-140px)] max-w-3xl flex-col space-y-4 font-sans">
+      {/* Üst Başlık */}
+      <div className="flex items-center justify-between border-b border-line pb-3">
+        <div>
+          <h1 className="font-serif text-xl font-bold text-ink">Koç</h1>
+          <p className="text-[13px] text-muted">
+            Haftalık antrenman, su ve beslenme verilerin bağlama eklendi.
+          </p>
         </div>
       </div>
 
       {/* Mesaj Akışı */}
-      <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+      <div className="flex-1 space-y-5 overflow-y-auto pr-1">
         {mesajlar.map((m) => (
           <div
             key={m.id}
@@ -215,45 +212,52 @@ export function CoachView() {
               m.gonderen === "kullanici" ? "items-end" : "items-start"
             }`}
           >
-            <div className="mb-1 flex items-center gap-2 px-1 text-[11px] text-muted">
-              <span>{m.gonderen === "kullanici" ? "Sen" : "Scout Koç"}</span>
-              <span>•</span>
+            <div className="mb-1 flex items-center gap-1.5 px-1 text-[12px] text-muted">
+              <span>{m.gonderen === "kullanici" ? "Sen" : "Koç"}</span>
+              <span>·</span>
               <span>{m.zaman}</span>
             </div>
 
-            <div
-              className={`relative max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm transition-all whitespace-pre-line ${
-                m.gonderen === "kullanici"
-                  ? "bg-pine text-cream rounded-br-sm"
-                  : "border border-line/80 bg-paper/90 text-ink rounded-bl-sm"
-              }`}
-            >
-              {m.metin}
-
-              {m.gonderen === "koc" && (
-                <div className="mt-2 flex justify-end border-t border-line/30 pt-1.5">
+            {m.gonderen === "kullanici" ? (
+              // Kullanıcı Mesajı: Pine Dolgulu Balon
+              <div className="relative max-w-[85%] rounded-xl bg-pine px-4 py-3 text-[15px] leading-relaxed text-paper shadow-sm whitespace-pre-line">
+                {m.metin}
+              </div>
+            ) : (
+              // Koç Mesajı: Balonsuz, Düz ve Ferah Editoryal Akış
+              <div className="group relative max-w-[92%] py-1 text-[15px] leading-relaxed text-ink whitespace-pre-line">
+                <p className="text-ink">{m.metin}</p>
+                <div className="mt-1 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => kopyala(m.id, m.metin)}
-                    className="text-[11px] text-muted hover:text-ink transition"
+                    className="inline-flex items-center gap-1 text-[12px] text-muted opacity-60 hover:opacity-100 hover:text-ink transition-opacity duration-150"
                   >
-                    {kopyalananId === m.id ? "✓ Kopyalandı" : "Kopyala"}
+                    {kopyalananId === m.id ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-pine" />
+                        <span className="text-pine">Kopyalandı</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Kopyala</span>
+                      </>
+                    )}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
 
+        {/* Yükleniyor Göstergesi: Sessiz 3 Nokta */}
         {yukleniyor && (
-          <div className="rounded-2xl border border-line/60 bg-paper/40 p-4 space-y-2 animate-pulse max-w-[70%]">
-            <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-emerald-400"></div>              <span className="text-xs font-medium text-muted">Koç haftalık verilerini inceliyor...</span>
-            </div>
-            <div className="space-y-1.5 pt-1">
-              <div className="h-2 w-3/4 rounded-full bg-line/60"></div>
-              <div className="h-2 w-1/2 rounded-full bg-line/40"></div>
-            </div>
+          <div className="flex items-center gap-1.5 py-2 px-1 text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted/60 animate-pulse [animation-delay:-0.3s]"></span>
+            <span className="h-1.5 w-1.5 rounded-full bg-muted/60 animate-pulse [animation-delay:-0.15s]"></span>
+            <span className="h-1.5 w-1.5 rounded-full bg-muted/60 animate-pulse"></span>
+            <span className="ml-2 text-[13px] text-muted">Koç düşünüyor...</span>
           </div>
         )}
 
@@ -262,72 +266,81 @@ export function CoachView() {
 
       {/* Hata Bildirimi */}
       {hata && (
-        <div className="flex items-center gap-2 rounded-xl border border-clay/30 bg-clay/10 p-3 text-xs text-clay">
-          <span>⚠️</span>
-          <span>{hata}</span>
+        <div className="flex items-center gap-2 rounded-xl border border-clay/30 bg-clay/5 p-3 text-[13px] text-clay">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="leading-snug">{hata}</span>
         </div>
       )}
 
-      {/* Hızlı Sorular */}
-      <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
-        {HIZLI_SORULAR.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => soruyuGonder(item)}
-            disabled={yukleniyor}
-            className="whitespace-nowrap rounded-xl border border-line bg-paper/80 px-3 py-1.5 text-xs text-muted transition hover:border-pine/60 hover:bg-cream hover:text-ink active:scale-95 disabled:opacity-50"
-          >
-            {item}
-          </button>
-        ))}
-      </div>
+      {/* Hızlı Sorular: Boşken Dikey Liste, Konuşma Başlayınca Yatay Şerit */}
+      {sadeceKarsilamaVar ? (
+        <div className="space-y-2 py-1">
+          <span className="text-[12px] font-medium text-muted block mb-1">
+            Önerilen Sorular:
+          </span>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {HIZLI_SORULAR.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => soruyuGonder(item)}
+                disabled={yukleniyor}
+                className="flex min-h-[44px] items-center rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left text-[13px] text-ink hover:border-muted/40 transition-colors duration-150 disabled:opacity-50"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+          {HIZLI_SORULAR.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => soruyuGonder(item)}
+              disabled={yukleniyor}
+              className="whitespace-nowrap rounded-xl border border-line bg-surface px-3 py-1.5 text-[13px] text-muted hover:border-muted/40 hover:text-ink transition-colors duration-150 active:scale-95 disabled:opacity-50"
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Giriş Alanı */}
-      <div className="group relative rounded-2xl border border-line bg-paper/60 p-2 shadow-sm transition-all duration-200 focus-within:border-pine focus-within:ring-2 focus-within:ring-pine/20 hover:border-line/80">
+      {/* Giriş Alanı: Tek Parça, Sol Mic, Orta Textarea, Sağ ArrowUp */}
+      <div className="relative flex items-center gap-2 rounded-xl border border-line bg-surface p-2 focus-within:border-muted/60 transition-colors duration-150">
+        <button
+          type="button"
+          onClick={sesleDinle}
+          aria-label={dinleniyor ? "Dinleniyor" : "Sesle sor"}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors duration-150 ${
+            dinleniyor
+              ? "bg-clay/10 text-clay"
+              : "text-muted hover:text-ink hover:bg-paper"
+          }`}
+        >
+          <Mic className={`w-5 h-5 ${dinleniyor ? "animate-pulse" : ""}`} />
+        </button>
+
         <textarea
-          rows={2}
+          rows={1}
           value={soru}
           onChange={(e) => setSoru(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Koça bir şey sor... (Enter ile gönder, Shift + Enter ile alt satır)"
-          className="w-full resize-none bg-transparent px-3 pt-2 text-sm text-ink outline-none placeholder:text-muted/70"
+          placeholder={dinleniyor ? "Dinleniyor..." : "Bir şey sor..."}
+          className="flex-1 resize-none bg-transparent py-2 px-1 text-[15px] leading-normal text-ink outline-none placeholder:text-muted/60 max-h-32"
         />
 
-        <div className="mt-2 flex items-center justify-between border-t border-line/40 px-2 pt-2">
-          <button
-            type="button"
-            onClick={sesleDinle}
-            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
-              dinleniyor
-                ? "bg-clay/20 text-clay ring-1 ring-clay animate-pulse"
-                : "text-muted hover:bg-cream hover:text-ink"
-            }`}
-          >
-            <span>{dinleniyor ? "🔴" : "🎙️"}</span>
-            <span>{dinleniyor ? "Dinleniyor..." : "Sesle Sor"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => soruyuGonder(soru)}
-            disabled={yukleniyor || !soru.trim()}
-            className="flex items-center gap-1.5 rounded-xl bg-pine px-4 py-1.5 text-xs font-semibold text-cream shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95"
-          >
-            {yukleniyor ? (
-              <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cream [animation-delay:-0.3s]"></span>
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cream [animation-delay:-0.15s]"></span>
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cream"></span>
-              </span>
-            ) : (
-              <>
-                <span>Gönder</span>
-                <span className="text-xs">↗</span>
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => soruyuGonder(soru)}
+          disabled={yukleniyor || !soru.trim()}
+          aria-label="Gönder"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pine text-paper transition-opacity duration-150 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
       </div>
     </div>
   );

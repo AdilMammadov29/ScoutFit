@@ -4,16 +4,12 @@ import { Capacitor, CapacitorHttp } from "@capacitor/core";
 // TEK MERKEZİ YAPILANDIRMA: Sadece Burayı Değiş!
 // ==========================================
 export const AI_CONFIG = {
-  // Groq API Anahtarı
-  apiKey: "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",
-
-  // Endpoint
+  // Vercel'deki şifreyi alır, bulamazsa boş string döner (TypeScript hatasını önler)
+  apiKey: (import.meta.env.VITE_GROQ_API_KEY as string) || "", 
   baseUrl: "https://api.groq.com/openai/v1/chat/completions",
-
-  // Aktif üretim modeli
   models: {
-    coach: "llama-3.1-8b-instant",
-    food: "llama-3.1-8b-instant",
+    coach: "openai/gpt-oss-20b",
+    food: "openai/gpt-oss-20b",
   },
 };
 
@@ -38,6 +34,12 @@ export async function sendAIChatRequest(
   const model = options.model || AI_CONFIG.models.coach;
   const temperature = options.temperature ?? 0.3;
   const max_tokens = options.maxTokens ?? 600;
+
+  // Şifre Vercel'den gelmezse hata fırlatıp çökmesini engeller
+  if (!AI_CONFIG.apiKey) {
+    console.warn("GROQ API Key bulunamadı! Lütfen Vercel 'Environment Variables' kısmına VITE_GROQ_API_KEY ekleyin.");
+    return "Yapay zeka koçu şu anda ayarlanamadı. Lütfen sistem yöneticisinin (Vercel) API anahtarını eklemesini bekleyin.";
+  }
 
   console.log("--> GROQ ISTEGI ATILIYOR | Model:", model, "| URL:", AI_CONFIG.baseUrl);
 

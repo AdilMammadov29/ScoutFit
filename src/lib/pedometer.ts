@@ -1,52 +1,125 @@
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 
 export type AdimGuncellemeCallback = (adimSayisi: number) => void;
 
-let dinleyiciAktif = false;
+const STORAGE_KEY = "scoutfit_pedometer_state_v2";
 
-function bugunKey(): string {
-  return new Date().toISOString().split("T")[0];
+interface Durum {
+  gun: string;      // Yerel tarih (YYYY-MM-DD)
+  baz: number;      // Günün başlangıç sayaç değeri
+  tasinan: number;  // Telefon yeniden başlamadan önce biriken adımlar
+  sonHam: number;   // Son okunan ham sayaç değeri
 }
 
-const STORAGE_KEY_BASE = "scoutfit_pedometer_base";
-const STORAGE_KEY_DATE = "scoutfit_pedometer_date";
-const STORAGE_KEY_DAILY_STEPS = "scoutfit_pedometer_daily_steps";
+let dinleyiciAktif = false;
+let aktifCallback: AdimGuncellemeCallback | null = null;
+let appDinleyici: { remove: () => Promise<void> } | null = null;
 
-function hamAdimiIsle(hamAdim: number, onGuncelle: AdimGuncellemeCallback) {
-  if (isNaN(hamAdim) || hamAdim <= 0) return;
+// Yerel saate göre tarih (toISOString UTC verir, Türkiye'de gün 03:00'te değişirdi)
+function tarihKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const g = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${g}`;
+}
+
+function bugunKey(): string {
+  return tarihKey(new Date());
+}
+
+function dunKey(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return tarihKey(d);
+}
+
+function durumOku(): Durum | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Durum) : null;
+  } catch {
+    return null;
+  }
+}
+
+function durumYaz(d: Durum) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+  } catch {
+    /* depolama dolu olabilir, sessiz geç */
+  }
+}
+
+function netAdimHesapla(d: Durum, ham: number): number {
+  return d.tasinan + Math.max(0, ham - d.baz);
+}
+
+function hamAdimiIsle(ham: number) {
+  if (!Number.isFinite(ham) || ham < 0) return;
 
   const bugun = bugunKey();
-  const sonTarih = localStorage.getItem(STORAGE_KEY_DATE);
-  let bazAdim = Number(localStorage.getItem(STORAGE_KEY_BASE) || "0");
+  const eski = durumOku();
+  let d: Durum;
 
-  // Gün değiştiyse, ilk kez açılıyorsa veya telefon yeniden başlatıldıysa baz değeri güncelle
-  if (sonTarih !== bugun || bazAdim <= 0 || hamAdim < bazAdim) {
-    bazAdim = hamAdim;
-    localStorage.setItem(STORAGE_KEY_DATE, bugun);
-    localStorage.setItem(STORAGE_KEY_BASE, bazAdim.toString());
+  if (!eski) {
+    // İlk kurulum: bugünü sıfırdan başlat
+    d = { gun: bugun, baz: ham, tasinan: 0, sonHam: ham };
+  } else if (eski.gun !== bugun) {
+    // Yeni gün
+    const yenidenBaslamis = ham < eski.sonHam;
+    let baz: number;
+    if (yenidenBaslamis) {
+      baz = 0; // sayaç sıfırlanmış, tüm değer bugüne ait
+    } else if (eski.gun === dunKey()) {
+      baz = eski.sonHam; // son görülen andan beri olan adımlar bugüne yazılır
+    } else {
+      baz = ham; // uzun süre açılmamış, eski adımları bugüne yazma
+    }
+    d = { gun: bugun, baz, tasinan: 0, sonHam: ham };
+  } else if (ham < eski.sonHam) {
+    // Aynı gün telefon yeniden başladı: o ana kadarki adımları taşı
+    d = {
+      gun: eski.gun,
+      baz: 0,
+      tasinan: netAdimHesapla(eski, eski.sonHam),
+      sonHam: ham,
+    };
+  } else {
+    d = { ...eski, sonHam: ham };
   }
 
-  const netAdim = Math.max(0, hamAdim - bazAdim);
-  localStorage.setItem(STORAGE_KEY_DAILY_STEPS, netAdim.toString());
-  onGuncelle(netAdim);
+  durumYaz(d);
+  aktifCallback?.(netAdimHesapla(d, ham));
+}
+
+async function anlikOlcumAl() {
+  try {
+    const { CapacitorPedometer } = await import("@capgo/capacitor-pedometer");
+    const anlik = await CapacitorPedometer.getMeasurement();
+    if (anlik?.numberOfSteps != null) {
+      hamAdimiIsle(Number(anlik.numberOfSteps));
+    }
+  } catch (e) {
+    console.warn("[Pedometer] Anlık ölçüm alınamadı:", e);
+  }
 }
 
 export async function adimTakibiniBaslat(onGuncelle: AdimGuncellemeCallback): Promise<void> {
-  if (!Capacitor.isNativePlatform()) {
-    return;
-  }
+  if (!Capacitor.isNativePlatform()) return;
+
+  // Her çağrıda en güncel callback kullanılsın
+  aktifCallback = onGuncelle;
 
   try {
     const { CapacitorPedometer } = await import("@capgo/capacitor-pedometer");
 
-    // 1. Donanım Kontrolü
     const check = await CapacitorPedometer.isAvailable();
     if (!check.stepCounting) {
       console.warn("[Pedometer] Cihazda adım sayma donanımı bulunamadı.");
       return;
     }
 
-    // 2. İzin Kontrolü ve İstemi (Android 10+ için zorunlu)
     const stat = await CapacitorPedometer.checkPermissions();
     if (stat.activityRecognition !== "granted") {
       const req = await CapacitorPedometer.requestPermissions();
@@ -56,35 +129,32 @@ export async function adimTakibiniBaslat(onGuncelle: AdimGuncellemeCallback): Pr
       }
     }
 
-    // 3. Hafızadaki mevcut adımı hemen ekrana ver
-    const kayitliAdim = Number(localStorage.getItem(STORAGE_KEY_DAILY_STEPS) || "0");
-    if (kayitliAdim > 0) {
-      onGuncelle(kayitliAdim);
+    // Kayıtlı bugünkü adımı hemen göster
+    const kayitli = durumOku();
+    if (kayitli && kayitli.gun === bugunKey()) {
+      onGuncelle(netAdimHesapla(kayitli, kayitli.sonHam));
     }
 
-    // 4. Donanımdan anlık tek seferlik ölçüm çek
-    try {
-      const anlik = await CapacitorPedometer.getMeasurement();
-      if (anlik?.numberOfSteps) {
-        hamAdimiIsle(anlik.numberOfSteps, onGuncelle);
-      }
-    } catch (e) {
-      console.warn("[Pedometer] Anlık ölçüm alınamadı:", e);
-    }
+    // Donanımdaki güncel değeri oku
+    await anlikOlcumAl();
 
-    // 5. Dinleyiciyi bağla ve resmi başlatma fonksiyonunu tetikle
     if (!dinleyiciAktif) {
-      dinleyiciAktif = true;
-
       await CapacitorPedometer.addListener("measurement", (event) => {
-        const hamAdim = Number(event?.numberOfSteps ?? 0);
-        hamAdimiIsle(hamAdim, onGuncelle);
+        hamAdimiIsle(Number(event?.numberOfSteps ?? 0));
       });
-
-      // Eklentinin dokümantasyonundaki resmi başlatma komutu
       await CapacitorPedometer.startMeasurementUpdates();
+      dinleyiciAktif = true;
+    }
+
+    // Uygulama arka plandan dönünce sayacı yeniden oku.
+    // Donanım sayacı arka planda da çalışır, burada eksik kalanı yakalıyoruz.
+    if (!appDinleyici) {
+      appDinleyici = await App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) anlikOlcumAl();
+      });
     }
   } catch (err) {
+    dinleyiciAktif = false;
     console.error("[Pedometer] Takip başlatma hatası:", err);
   }
 }
@@ -95,8 +165,14 @@ export async function adimTakibiniDurdur(): Promise<void> {
     const { CapacitorPedometer } = await import("@capgo/capacitor-pedometer");
     await CapacitorPedometer.stopMeasurementUpdates();
     await CapacitorPedometer.removeAllListeners();
-    dinleyiciAktif = false;
   } catch (e) {
     console.warn("[Pedometer] Durdurma hatası:", e);
+  } finally {
+    dinleyiciAktif = false;
+    aktifCallback = null;
+    if (appDinleyici) {
+      await appDinleyici.remove();
+      appDinleyici = null;
+    }
   }
 }

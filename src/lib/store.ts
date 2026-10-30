@@ -35,7 +35,7 @@ type FitState = {
   profil: Profil | null;
   antrenmanlar: Antrenman[];
   sohbet: Mesaj[];
-  ogunler: Ogun[]; // <-- YENİ EKLENDİ
+  ogunler: Ogun[];
   kaydetProfil: (profil: Profil) => void;
   ekleAntrenman: (taslak: Taslak) => void;
   ekleProgram: (gunler: Taslak[]) => void;
@@ -43,8 +43,8 @@ type FitState = {
   temizleAntrenman: () => void;
   ekleMesaj: (mesaj: Mesaj) => void;
   temizleSohbet: () => void;
-  ekleOgun: (isim: string, kalori: number) => void; // <-- YENİ EKLENDİ
-  silOgun: (id: string) => void; // <-- YENİ EKLENDİ
+  ekleOgun: (isim: string, kalori: number) => void;
+  silOgun: (id: string) => void;
 };
 
 function damgala(taslak: Taslak): Antrenman {
@@ -61,7 +61,7 @@ export const useFit = create<FitState>()(
       profil: null,
       antrenmanlar: [],
       sohbet: [],
-      ogunler: [], // <-- YENİ EKLENDİ (Başlangıçta boş liste)
+      ogunler: [],
       kaydetProfil: (profil) => set({ profil }),
       ekleAntrenman: (taslak) =>
         set((s) => ({
@@ -81,8 +81,6 @@ export const useFit = create<FitState>()(
           sohbet: [...s.sohbet, mesaj].slice(-24),
         })),
       temizleSohbet: () => set({ sohbet: [] }),
-      
-      // --- YENİ EKLENEN ÖĞÜN FONKSİYONLARI ---
       ekleOgun: (isim, kalori) =>
         set((s) => ({
           ogunler: [
@@ -95,18 +93,17 @@ export const useFit = create<FitState>()(
           ogunler: s.ogunler.filter((o) => o.id !== id),
         })),
     }),
-    { 
-      // Aktif kullanıcının auth storage'ından ID'sini okuyarak her hesaba özel hafıza anahtarı üretiyoruz
-     name: `scoutfit-store-${(() => {
-  try {
-    const authData = localStorage.getItem("scoutfit-auth");
-    if (authData) {
-      const parsed = JSON.parse(authData);
-      return parsed?.state?.currentUser?.id || "guest";
-    }
-  } catch (e) {}
-  return "guest";
-})()}`
+    {
+      name: `scoutfit-store-${(() => {
+        try {
+          const authData = localStorage.getItem("scoutfit-auth");
+          if (authData) {
+            const parsed = JSON.parse(authData);
+            return parsed?.state?.currentUser?.id || "guest";
+          }
+        } catch (e) {}
+        return "guest";
+      })()}`,
     },
   ),
 );

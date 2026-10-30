@@ -2,11 +2,20 @@ import { useState, type ReactNode } from "react";
 import { useFit } from "../lib/store";
 import { useEkstra, type Birim, type KiloKaydi } from "../lib/extras";
 import type { Section } from "./shell";
-import { Btn, PageTitle, Panel, Row } from "./ui";
+import {
+  User,
+  Target,
+  TrendingDown,
+  Trash2,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+} from "lucide-react";
 
 const LB = 2.20462;
 const alanClass =
-  "min-h-11 w-full rounded-xl border border-line bg-cream px-3 text-sm text-ink outline-none focus:border-pine";
+  "w-full min-h-[44px] rounded-xl border border-line bg-paper px-3.5 py-2.5 text-[14px] text-ink outline-none placeholder:text-muted/60 transition-colors focus:border-muted/60";
 
 function sayiOku(metin: string): number | null {
   const n = Number(metin.replace(",", ".").trim());
@@ -23,14 +32,14 @@ function kiloYaz(kg: number, birim: Birim) {
 
 function tarihKisa(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" }).format(
-    new Date(iso),
+    new Date(iso)
   );
 }
 
 function Alan({ etiket, children }: { etiket: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm text-muted">{etiket}</span>
+      <span className="mb-1.5 block text-[13px] text-muted">{etiket}</span>
       {children}
     </label>
   );
@@ -46,6 +55,7 @@ function KisiselPanel() {
   const [adForm, setAdForm] = useState(ad || "");
   const [boy, setBoy] = useState(String(profil?.boy ?? ""));
   const [kilo, setKilo] = useState(String(profil?.kilo ?? ""));
+  const [hedefKilo, setHedefKilo] = useState(String(profil?.hedefKilo ?? ""));
   const [yas, setYas] = useState(String(profil?.yas ?? ""));
   const [not, setNot] = useState("");
 
@@ -54,19 +64,28 @@ function KisiselPanel() {
   const kaydet = () => {
     const b = sayiOku(boy);
     const k = sayiOku(kilo);
+    const hk = sayiOku(hedefKilo);
     const y = sayiOku(yas);
     if (!b || b < 100 || b > 250) return setNot("Boy 100–250 cm arasında olmalı.");
     if (!k || k < 30 || k > 300) return setNot("Kilo 30–300 kg arasında olmalı.");
+    if (!hk || hk < 30 || hk > 300) return setNot("Hedef kilo 30–300 kg arasında olmalı.");
     if (!y || y < 12 || y > 100) return setNot("Yaş 12–100 arasında olmalı.");
-    kaydetProfil({ ...profil, boy: b, kilo: k, yas: Math.round(y) });
+    kaydetProfil({ ...profil, boy: b, kilo: k, hedefKilo: hk, yas: Math.round(y) });
     setAd(adForm.trim().slice(0, 40));
     if (k !== profil.kilo) ekleKilo(k);
     setNot("Bilgiler güncellendi.");
   };
 
   return (
-    <Panel title="Kişisel Bilgiler ve Ölçüler">
-      <div className="grid gap-4 py-5 sm:grid-cols-2">
+    <div className="rounded-xl border border-line bg-surface p-5">
+      <div className="flex items-center gap-2 border-b border-line pb-3 mb-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pine/10 text-pine">
+          <User className="w-4 h-4" />
+        </div>
+        <h2 className="font-serif text-lg font-bold text-ink">Kişisel Bilgiler ve Ölçüler</h2>
+      </div>
+
+      <div className="grid gap-3.5 sm:grid-cols-2">
         <Alan etiket="Ad Soyad">
           <input
             className={alanClass}
@@ -99,24 +118,51 @@ function KisiselPanel() {
             onChange={(e) => setKilo(e.target.value)}
           />
         </Alan>
+        <div className="sm:col-span-2">
+          <Alan etiket="Hedef Kilo (kg)">
+            <input
+              className={alanClass}
+              value={hedefKilo}
+              inputMode="decimal"
+              placeholder="örn. 75"
+              onChange={(e) => setHedefKilo(e.target.value)}
+            />
+          </Alan>
+        </div>
       </div>
-      <div className="flex items-center gap-4 pb-5">
-        <Btn onClick={kaydet}>Kaydet</Btn>
-        {not ? <p className="text-sm text-muted">{not}</p> : null}
+
+      <div className="mt-5 flex flex-wrap items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={kaydet}
+          className="min-h-[44px] rounded-xl bg-pine px-5 py-2.5 text-[13px] font-medium text-paper transition-opacity hover:opacity-95 active:scale-95"
+        >
+          Kaydet
+        </button>
+        {not && (
+          <div className="flex items-center gap-1.5 text-[13px] text-muted">
+            {not.includes("güncellendi") ? (
+              <CheckCircle2 className="w-4 h-4 text-pine shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-clay shrink-0" />
+            )}
+            <span>{not}</span>
+          </div>
+        )}
       </div>
-    </Panel>
+    </div>
   );
 }
 
 function HedeflerPanel() {
   const [haftalikKm, setHaftalikKm] = useState(
-    () => localStorage.getItem("scoutfit_hedef_km") || "20",
+    () => localStorage.getItem("scoutfit_hedef_km") || "20"
   );
   const [hedefHiz, setHedefHiz] = useState(
-    () => localStorage.getItem("scoutfit_hedef_hiz") || "27",
+    () => localStorage.getItem("scoutfit_hedef_hiz") || "27"
   );
   const [haftalikGun, setHaftalikGun] = useState(
-    () => localStorage.getItem("scoutfit_hedef_gun") || "4",
+    () => localStorage.getItem("scoutfit_hedef_gun") || "4"
   );
   const [kaydedildi, setKaydedildi] = useState(false);
 
@@ -129,9 +175,16 @@ function HedeflerPanel() {
   };
 
   return (
-    <Panel title="Dönemlik Hedefler">
-      <div className="grid gap-4 py-5 sm:grid-cols-3">
-        <Alan etiket="Haftalık Mesafe Hedefi (km)">
+    <div className="rounded-xl border border-line bg-surface p-5">
+      <div className="flex items-center gap-2 border-b border-line pb-3 mb-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pine/10 text-pine">
+          <Target className="w-4 h-4" />
+        </div>
+        <h2 className="font-serif text-lg font-bold text-ink">Dönemlik Hedefler</h2>
+      </div>
+
+      <div className="grid gap-3.5 sm:grid-cols-3">
+        <Alan etiket="Haftalık Mesafe (km)">
           <input
             className={alanClass}
             value={haftalikKm}
@@ -139,7 +192,7 @@ function HedeflerPanel() {
             onChange={(e) => setHaftalikKm(e.target.value)}
           />
         </Alan>
-        <Alan etiket="Hedef Max Hız (km/s)">
+        <Alan etiket="Hedef Hız (km/s)">
           <input
             className={alanClass}
             value={hedefHiz}
@@ -147,7 +200,7 @@ function HedeflerPanel() {
             onChange={(e) => setHedefHiz(e.target.value)}
           />
         </Alan>
-        <Alan etiket="Haftalık Antrenman Sıklığı (Gün)">
+        <Alan etiket="Antrenman Sıklığı (Gün)">
           <input
             className={alanClass}
             value={haftalikGun}
@@ -156,11 +209,23 @@ function HedeflerPanel() {
           />
         </Alan>
       </div>
-      <div className="flex items-center gap-4 pb-5">
-        <Btn onClick={kaydetHedefler}>Hedefleri Güncelle</Btn>
-        {kaydedildi ? <p className="text-sm text-pine font-medium">Hedefler kaydedildi.</p> : null}
+
+      <div className="mt-5 flex items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={kaydetHedefler}
+          className="min-h-[44px] rounded-xl bg-pine px-5 py-2.5 text-[13px] font-medium text-paper transition-opacity hover:opacity-95 active:scale-95"
+        >
+          Hedefleri Güncelle
+        </button>
+        {kaydedildi && (
+          <div className="flex items-center gap-1.5 text-[13px] text-pine">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>Hedefler kaydedildi.</span>
+          </div>
+        )}
       </div>
-    </Panel>
+    </div>
   );
 }
 
@@ -205,7 +270,7 @@ function KiloGrafik({
           y2={y(hedefD)}
           stroke="currentColor"
           strokeDasharray="4 4"
-          className="text-clay"
+          className="text-clay/60 stroke-[1.5]"
         />
       ) : null}
       <polyline
@@ -225,13 +290,13 @@ function KiloGrafik({
           className="text-pine"
         />
       ))}
-      <text x={P} y={H - 8} className="fill-muted text-[10px]">
+      <text x={P} y={H - 8} className="fill-muted text-[11px] font-sans">
         {tarihKisa(aktifKayitlar[0].tarih)}
       </text>
-      <text x={W - P} y={H - 8} textAnchor="end" className="fill-muted text-[10px]">
+      <text x={W - P} y={H - 8} textAnchor="end" className="fill-muted text-[11px] font-sans">
         {tarihKisa(aktifKayitlar[aktifKayitlar.length - 1].tarih)}
       </text>
-      <text x={P} y={14} className="fill-muted text-[10px]">
+      <text x={P} y={16} className="fill-muted text-[11px] font-sans">
         {sayiYaz(max)} {birim}
       </text>
     </svg>
@@ -264,20 +329,33 @@ function KiloPanel() {
   const sonBes = kayitlar.slice(-5).reverse();
 
   return (
-    <Panel title="Kilo ve Gelişim">
-      <KiloGrafik
-        kayitlar={kayitlar}
-        hedef={profil?.hedefKilo}
-        birim={birim}
-        guncelKilo={profil?.kilo}
-      />
-      {kayitlar.length >= 2 ? (
-        <Row
-          label="Toplam değişim"
-          value={`${fark > 0 ? "+" : ""}${sayiYaz(fark)} ${birim}`}
+    <div className="rounded-xl border border-line bg-surface p-5">
+      <div className="flex items-center gap-2 border-b border-line pb-3 mb-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pine/10 text-pine">
+          <TrendingDown className="w-4 h-4" />
+        </div>
+        <h2 className="font-serif text-lg font-bold text-ink">Kilo ve Gelişim</h2>
+      </div>
+
+      <div className="rounded-xl border border-line bg-paper/40 p-2">
+        <KiloGrafik
+          kayitlar={kayitlar}
+          hedef={profil?.hedefKilo}
+          birim={birim}
+          guncelKilo={profil?.kilo}
         />
+      </div>
+
+      {kayitlar.length >= 2 ? (
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-paper/60 px-4 py-3">
+          <span className="text-[13px] text-muted">Toplam Değişim</span>
+          <span className="font-serif text-base font-bold text-ink">
+            {fark > 0 ? "+" : ""}{sayiYaz(fark)} {birim}
+          </span>
+        </div>
       ) : null}
-      <div className="flex items-end gap-3 py-5">
+
+      <div className="mt-4 flex items-end gap-2.5">
         <div className="flex-1">
           <Alan etiket={`Bugünkü kilo (${birim})`}>
             <input
@@ -289,34 +367,47 @@ function KiloPanel() {
             />
           </Alan>
         </div>
-        <Btn onClick={ekle}>Ekle</Btn>
+        <button
+          type="button"
+          onClick={ekle}
+          className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-pine px-4 py-2.5 text-[13px] font-medium text-paper transition-opacity hover:opacity-95 active:scale-95 shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Ekle</span>
+        </button>
       </div>
-      {not ? <p className="pb-4 text-sm text-muted">{not}</p> : null}
-      {sonBes.length > 0 ? (
-        <ul className="divide-y divide-line border-t border-line">
-          {sonBes.map((k: any) => (
-            <li key={k.id} className="flex items-center justify-between py-3 text-sm">
-              <span className="text-muted">{tarihKisa(k.tarih)}</span>
-              <span className="flex items-center gap-4">
-                <span className="text-ink">{kiloYaz(k.kilo, birim)}</span>
-                <button
-                  type="button"
-                  onClick={() => silKilo(k.id)}
-                  className="text-muted hover:text-clay"
-                  aria-label="Kaydı sil"
-                >
-                  Sil
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="pb-5 text-sm text-muted">
-          Henüz geçmiş kayıt yok. Profilindeki kilo baz alınıyor.
-        </p>
+
+      {not && (
+        <p className="mt-2 text-[13px] text-clay">{not}</p>
       )}
-    </Panel>
+
+      <div className="mt-5 border-t border-line pt-3">
+        {sonBes.length > 0 ? (
+          <ul className="divide-y divide-line">
+            {sonBes.map((k: any) => (
+              <li key={k.id} className="flex items-center justify-between py-2.5 text-[13px]">
+                <span className="text-muted">{tarihKisa(k.tarih)}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-serif font-semibold text-ink">{kiloYaz(k.kilo, birim)}</span>
+                  <button
+                    type="button"
+                    onClick={() => silKilo(k.id)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-muted hover:text-clay hover:bg-paper transition-colors"
+                    aria-label="Kaydı sil"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="py-2 text-center text-[13px] text-muted">
+            Henüz geçmiş kayıt yok. Profilindeki kilo baz alınıyor.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -325,22 +416,33 @@ export function ProfilView({ git }: { git: (s: Section) => void }) {
   const ad = useEkstra((s: any) => s.ad);
 
   return (
-    <div>
-      <PageTitle
-        index="06"
-        title={ad ? ad : "Profil"}
-        lede="Fiziksel ölçülerin, hedeflerin ve gelişim grafiğin."
-      />
+    <div className="space-y-6 pb-12 font-sans">
+      {/* Üst Başlık */}
+      <div className="border-b border-line pb-4">
+        <span className="text-[13px] font-medium text-muted block">
+          Kişisel Bilgiler
+        </span>
+        <h1 className="font-serif text-2xl font-bold text-ink">
+          {ad ? ad : "Profil"}
+        </h1>
+        <p className="mt-1 text-[13px] text-muted">
+          Fiziksel ölçülerin, hedeflerin ve gelişim grafiğin.
+        </p>
+      </div>
+
       <div className="space-y-6">
         {!profil ? (
-          <Panel>
-            <div className="py-6">
-              <p className="text-sm text-muted">Önce ölçülerini kaydet.</p>
-              <div className="mt-5">
-                <Btn onClick={() => git("goal")}>Hedefe git</Btn>
-              </div>
-            </div>
-          </Panel>
+          <div className="rounded-xl border border-line bg-surface p-6 text-center">
+            <p className="text-[14px] text-muted">Önce ölçülerini kaydet.</p>
+            <button
+              type="button"
+              onClick={() => git("goal")}
+              className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-pine px-5 py-2.5 text-[13px] font-medium text-paper transition-opacity hover:opacity-95 active:scale-95"
+            >
+              <span>Hedefe Git</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         ) : (
           <>
             <KisiselPanel />

@@ -29,7 +29,7 @@ export function AuthView() {
         provider: "google",
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: isNative,
+          skipBrowserRedirect: true,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -41,13 +41,16 @@ export function AuthView() {
 
       if (data?.url) {
         if (isNative) {
-          await Browser.open({ url: data.url, windowName: "_self" });
+          await Browser.open({ url: data.url, windowName: "_system" });
         } else {
           window.location.href = data.url;
         }
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || (isTr ? "Google ile giriş başlatılamadı." : "Failed to start Google sign-in."));
+      setErrorMsg(
+        err?.message ||
+          (isTr ? "Google ile giriş başlatılamadı." : "Failed to start Google sign-in.")
+      );
     } finally {
       setLoading(false);
     }
@@ -91,45 +94,45 @@ export function AuthView() {
   };
 
   return (
-    <div className="min-h-screen bg-[#121212] text-zinc-100 flex flex-col justify-between items-center px-6 py-12 select-none">
+    <div className="min-h-screen bg-paper text-ink flex flex-col justify-between items-center px-6 py-12 select-none font-sans transition-colors duration-150">
       <div className="w-full max-w-sm flex flex-col items-center pt-8">
-        {/* Minimal Monogram Logo */}
-        <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center mb-10 shadow-2xl">
-          <span className="text-[#121212] font-black tracking-tighter text-2xl font-mono">SF</span>
+        {/* Monogram Logo */}
+        <div className="w-14 h-14 rounded-2xl bg-pine text-paper flex items-center justify-center mb-8 shadow-sm">
+          <span className="font-serif font-bold text-2xl tracking-tight">SF</span>
         </div>
 
-        {/* Tipografi / Slogan */}
-        <div className="text-center space-y-3">
-          <h1 className="text-3xl font-extrabold tracking-tight text-white uppercase font-sans">
+        {/* Tipografi & Slogan */}
+        <div className="text-center space-y-2">
+          <h1 className="font-serif text-3xl font-bold tracking-tight text-ink">
             ScoutFit
           </h1>
-          <p className="text-sm font-semibold tracking-widest text-zinc-400 uppercase font-mono">
-            {isTr ? "BİLİMLE GELİŞTİRİLDİ, SİHİR GİBİ HİSSETTİRİR" : "DRIVEN BY SCIENCE, FEELS LIKE MAGIC"}
+          <p className="text-[13px] text-muted leading-relaxed">
+            {isTr ? "Kişisel Antrenman ve Beslenme Günlüğü" : "Personal Training & Nutrition Journal"}
           </p>
         </div>
       </div>
 
       <div className="w-full max-w-sm space-y-4 pb-4">
         {errorMsg && (
-          <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs leading-relaxed">
+          <div className="p-3.5 rounded-xl border border-clay/30 bg-clay/5 text-clay text-[13px] leading-relaxed">
             {errorMsg}
           </div>
         )}
         {infoMsg && (
-          <div className="p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 text-xs leading-relaxed">
+          <div className="p-3.5 rounded-xl border border-pine/30 bg-pine/5 text-pine text-[13px] leading-relaxed">
             {infoMsg}
           </div>
         )}
 
-        {/* Ana Google Giriş Butonu */}
+        {/* Google Giriş Butonu */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full h-14 rounded-2xl bg-white text-black font-semibold text-sm px-5 flex items-center justify-between shadow-lg active:scale-[0.98] transition-all disabled:opacity-60"
+          className="w-full min-h-[48px] rounded-xl border border-line bg-surface text-ink font-medium text-[14px] px-5 flex items-center justify-between shadow-sm active:scale-[0.99] transition-all hover:border-muted/40 disabled:opacity-50"
         >
-          <div className="flex items-center gap-3.5">
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -147,43 +150,45 @@ export function AuthView() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span className="font-medium text-sm">
+            <span>
               {isTr ? "Google ile Devam Et" : "Continue with Google"}
             </span>
           </div>
           {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-black" />
+            <Loader2 className="w-4 h-4 animate-spin text-muted" />
           ) : (
-            <ArrowRight className="w-4 h-4 text-zinc-500" />
+            <ArrowRight className="w-4 h-4 text-muted" />
           )}
         </button>
 
-        {/* E-posta ile Giriş Opsiyonu */}
-        <div className="pt-2">
+        {/* E-posta ile Giriş Akordeon */}
+        <div className="pt-1">
           <button
             type="button"
             onClick={() => setShowEmailAuth(!showEmailAuth)}
-            className="w-full h-12 rounded-xl bg-[#1c1c1e] text-zinc-300 font-medium text-xs px-4 flex items-center justify-between border border-zinc-800/80 active:bg-zinc-800/80 transition-all"
+            className="w-full min-h-[44px] rounded-xl bg-surface text-ink font-medium text-[13px] px-4 flex items-center justify-between border border-line hover:border-muted/40 transition-colors"
           >
             <div className="flex items-center gap-2.5">
-              <Mail className="w-4 h-4 text-zinc-400" />
+              <Mail className="w-4 h-4 text-muted" />
               <span>{isTr ? "E-posta ile Devam Et" : "Continue with Email"}</span>
             </div>
             {showEmailAuth ? (
-              <ChevronUp className="w-4 h-4 text-zinc-400" />
+              <ChevronUp className="w-4 h-4 text-muted" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-zinc-400" />
+              <ChevronDown className="w-4 h-4 text-muted" />
             )}
           </button>
 
           {showEmailAuth && (
-            <div className="mt-3 p-4 rounded-2xl bg-[#1c1c1e] border border-zinc-800/80 space-y-3.5">
-              <div className="flex border-b border-zinc-800 pb-2.5 text-xs font-semibold">
+            <div className="mt-3 p-4 rounded-xl bg-surface border border-line space-y-4">
+              <div className="flex border-b border-line pb-2 text-[13px] font-medium">
                 <button
                   type="button"
                   onClick={() => setMode("login")}
-                  className={`flex-1 text-center py-1 rounded-md transition-colors ${
-                    mode === "login" ? "text-white bg-zinc-800" : "text-zinc-500"
+                  className={`flex-1 text-center py-1.5 rounded-lg transition-colors ${
+                    mode === "login"
+                      ? "bg-paper text-ink font-semibold"
+                      : "text-muted hover:text-ink"
                   }`}
                 >
                   {isTr ? "Giriş" : "Login"}
@@ -191,8 +196,10 @@ export function AuthView() {
                 <button
                   type="button"
                   onClick={() => setMode("register")}
-                  className={`flex-1 text-center py-1 rounded-md transition-colors ${
-                    mode === "register" ? "text-white bg-zinc-800" : "text-zinc-500"
+                  className={`flex-1 text-center py-1.5 rounded-lg transition-colors ${
+                    mode === "register"
+                      ? "bg-paper text-ink font-semibold"
+                      : "text-muted hover:text-ink"
                   }`}
                 >
                   {isTr ? "Kayıt" : "Register"}
@@ -201,32 +208,32 @@ export function AuthView() {
 
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="email@example.com"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-black/60 border border-zinc-800 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                    className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl bg-paper border border-line text-[14px] text-ink placeholder:text-muted/60 outline-none focus:border-muted/60 transition-colors"
                   />
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-black/60 border border-zinc-800 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                    className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl bg-paper border border-line text-[14px] text-ink placeholder:text-muted/60 outline-none focus:border-muted/60 transition-colors"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-10 rounded-xl bg-white text-black font-semibold text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                  className="w-full min-h-[44px] rounded-xl bg-pine text-paper font-medium text-[13px] flex items-center justify-center gap-2 transition-opacity hover:opacity-95 active:scale-[0.99] disabled:opacity-50"
                 >
                   {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-black" />
+                    <Loader2 className="w-4 h-4 animate-spin text-paper" />
                   ) : mode === "login" ? (
                     isTr ? "Giriş Yap" : "Sign In"
                   ) : (
@@ -238,7 +245,7 @@ export function AuthView() {
           )}
         </div>
 
-        <p className="text-[11px] text-center text-zinc-600 pt-2 leading-relaxed">
+        <p className="text-[12px] text-center text-muted pt-2 leading-relaxed">
           {isTr
             ? "Devam ederek Kullanım Şartları ve Gizlilik Politikasını kabul etmiş olursunuz."
             : "By continuing, you agree to our Terms of Service and Privacy Policy."}

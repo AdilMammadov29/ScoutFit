@@ -50,3 +50,15 @@
   --color-pine: var(--color-pine);
   --color-clay: var(--color-clay);
 }
+/* Mobil Status Bar & Nav Bar Güvenli Alanları */
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 1.5rem);
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+}
+
+.pb-safe-nav {
+  padding-bottom: calc(5rem + max(env(safe-area-inset-bottom), 1rem));
+}

@@ -6,6 +6,17 @@ import { useFit } from "@/lib/store";
 import { useSettingsStore } from "@/lib/settingsStore";
 import { triggerHaptic, speakFeedback } from "@/lib/feedback";
 import { Geolocation } from "@capacitor/geolocation";
+import {
+  Compass,
+  Play,
+  Square,
+  AlertCircle,
+  Footprints,
+  Flame,
+  Clock,
+  Gauge,
+  Navigation,
+} from "lucide-react";
 
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
@@ -226,24 +237,25 @@ export function GpsTracker() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6 text-white space-y-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-extrabold tracking-tight text-[#6f9f87]">
+    <div className="space-y-6 font-sans">
+      <div className="border-b border-line pb-3">
+        <h2 className="font-serif text-xl font-bold text-ink">
           GPS Rota & Adım Takibi
         </h2>
-        <p className="text-sm text-gray-400">
-          Başlat düğmesine bas, rotan haritada çizilsin; mesafen ve adımların hesaplansın.
+        <p className="mt-1 text-[13px] text-muted">
+          Antrenmanı başlat, rotan haritada çizilsin; mesafen ve adımların hesaplansın.
         </p>
       </div>
 
       {hata && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
-          {hata}
+        <div className="flex items-center gap-2 rounded-xl border border-clay/30 bg-clay/5 p-3.5 text-[13px] text-clay">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{hata}</span>
         </div>
       )}
 
       {/* HARİTA */}
-      <div className="h-[380px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl relative z-0">
+      <div className="h-[340px] w-full rounded-xl overflow-hidden border border-line bg-surface shadow-sm relative z-0">
         <MapContainer
           center={simdikiKonum}
           zoom={17}
@@ -256,81 +268,87 @@ export function GpsTracker() {
           />
           <HaritaMerkezleyici center={simdikiKonum} />
           <Marker position={simdikiKonum}>
-            <Popup>Anlık Konumun 🚀</Popup>
+            <Popup>Anlık Konumun</Popup>
           </Marker>
 
           {settings.livePolyline && rota.length > 1 && (
-            <Polyline positions={rota} color="#6f9f87" weight={5} />
+            <Polyline positions={rota} color="#2d5a43" weight={4} />
           )}
         </MapContainer>
       </div>
 
       {/* İSTATİSTİKLER */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
-          <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Mesafe</span>
-          <div className="text-3xl font-black text-[#6f9f87]">
-            {mesafe.toFixed(2)} <span className="text-sm font-normal text-gray-300">km</span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <div className="rounded-xl border border-line bg-surface p-4 text-center">
+          <span className="text-[12px] text-muted block mb-1">Mesafe</span>
+          <div className="font-serif text-2xl font-bold text-pine">
+            {mesafe.toFixed(2)} <span className="font-sans text-[12px] font-normal text-muted">km</span>
           </div>
         </div>
-        <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
-          <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Adım Sayısı</span>
-          <div className="text-3xl font-black text-white">
-            {hesaplananAdim} <span className="text-sm font-normal text-gray-300">adım</span>
+        <div className="rounded-xl border border-line bg-surface p-4 text-center">
+          <span className="text-[12px] text-muted block mb-1">Adım</span>
+          <div className="font-serif text-2xl font-bold text-ink">
+            {hesaplananAdim.toLocaleString()} <span className="font-sans text-[12px] font-normal text-muted">adım</span>
           </div>
         </div>
-        <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
-          <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Yakılan Kalori</span>
-          <div className="text-3xl font-black text-[#b39573]">
-            {harcananKalori} <span className="text-sm font-normal text-gray-300">kcal</span>
+        <div className="rounded-xl border border-line bg-surface p-4 text-center">
+          <span className="text-[12px] text-muted block mb-1">Kalori</span>
+          <div className="font-serif text-2xl font-bold text-ink">
+            {harcananKalori} <span className="font-sans text-[12px] font-normal text-muted">kcal</span>
           </div>
         </div>
-        <div className="rounded-3xl border border-white/10 bg-[#1a1a1a] p-5 text-center shadow-xl">
-          <span className="text-[11px] uppercase tracking-wider text-gray-400 mb-1">Süre</span>
-          <div className="text-3xl font-black text-white">{sureyiFormatla(sure)}</div>
+        <div className="rounded-xl border border-line bg-surface p-4 text-center">
+          <span className="text-[12px] text-muted block mb-1">Süre</span>
+          <div className="font-serif text-2xl font-bold text-ink">{sureyiFormatla(sure)}</div>
         </div>
       </div>
 
-      {/* BUTONLAR */}
-      <div className="flex justify-center gap-4 pt-2">
+      {/* KONTROL BUTONU */}
+      <div className="flex justify-center pt-1">
         {!aktif ? (
           <button
+            type="button"
             onClick={antrenmaniBaslat}
-            className="rounded-2xl bg-[#6f9f87] px-12 py-4 text-base font-bold text-white shadow-lg shadow-[#6f9f87]/30 transition-all hover:bg-[#5a826e] hover:scale-105"
+            className="flex min-h-[48px] items-center gap-2 rounded-xl bg-pine px-8 py-3 text-[14px] font-medium text-paper transition-opacity duration-150 hover:opacity-95 active:scale-95"
           >
-            Antrenmanı Başlat 🚀
+            <Play className="w-4 h-4 fill-current" />
+            <span>Antrenmanı Başlat</span>
           </button>
         ) : (
           <button
+            type="button"
             onClick={antrenmaniBitir}
-            className="rounded-2xl bg-red-600 px-12 py-4 text-base font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:scale-105 animate-pulse"
+            className="flex min-h-[48px] items-center gap-2 rounded-xl bg-clay px-8 py-3 text-[14px] font-medium text-paper transition-opacity duration-150 hover:opacity-95 active:scale-95"
           >
-            Antrenmanı Bitir & Kaydet ⏹️
+            <Square className="w-4 h-4 fill-current" />
+            <span>Antrenmanı Bitir & Kaydet</span>
           </button>
         )}
       </div>
 
       {/* GEÇMİŞ */}
       {aktiviteler.length > 0 && (
-        <div className="mt-8 space-y-4">
-          <h3 className="text-xl font-bold text-white">Geçmiş Antrenmanlar</h3>
-          <div className="space-y-3">
+        <div className="rounded-xl border border-line bg-surface p-5">
+          <h3 className="font-serif text-base font-bold text-ink mb-3">Geçmiş GPS Kayıtları</h3>
+          <div className="divide-y divide-line">
             {aktiviteler.map((a) => (
               <div
                 key={a.id}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#1a1a1a] p-4 shadow-md"
+                className="py-3 flex items-center justify-between"
               >
                 <div>
-                  <span className="text-xs font-semibold text-[#6f9f87]">{a.tarih}</span>
-                  <div className="text-lg font-bold text-white mt-0.5">
-                    {a.mesafe} km · {sureyiFormatla(a.sure)} · {a.adim} adım
+                  <span className="text-[11px] font-medium text-pine">{a.tarih}</span>
+                  <div className="font-serif text-[15px] font-bold text-ink mt-0.5">
+                    {a.mesafe} km · {sureyiFormatla(a.sure)}
                   </div>
+                  <span className="text-[12px] text-muted mt-0.5 block">
+                    {a.adim} adım · ort. {a.ortalamaHiz} km/s
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-gray-400">Kalori / Hız</span>
-                  <div className="text-sm font-semibold text-[#b39573]">
-                    {a.kalori} kcal · {a.ortalamaHiz} km/s
-                  </div>
+                  <span className="font-serif text-sm font-semibold text-ink">
+                    {a.kalori} kcal
+                  </span>
                 </div>
               </div>
             ))}

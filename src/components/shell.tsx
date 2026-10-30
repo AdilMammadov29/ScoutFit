@@ -1,177 +1,110 @@
-import { useState } from "react";
-import { CoachView } from "@/components/coach";
-import { GoalView } from "@/components/goal";
-import { MealsView } from "@/components/meals";
-import { TodayView } from "@/components/today";
-import { TrainView } from "@/components/train";
+import React, { useState } from "react";
+import {
+  CalendarDays,
+  Dumbbell,
+  UtensilsCrossed,
+  User,
+  MessageSquare,
+  Settings,
+} from "lucide-react";
+import { TodayView } from "./today";
+import { TrainView } from "./train";
+import { MealsView } from "./meals";
 import { ProfilView } from "./profile";
+import { CoachView } from "./coach";
+import { GoalView } from "./goal";
 import { SettingsModal } from "./settingsModal";
-import { useAuth } from "../lib/authStore";
-import { AuthView } from "./auth";
-import { supabase } from "@/lib/supabase";
-import { bulutuDurdur } from "@/lib/sync";
 
-export type Section = "today" | "train" | "meals" | "profile" | "goal";
+export type Section = "today" | "train" | "meals" | "profile" | "coach" | "goal";
 
-const NAV: { id: "today" | "train" | "meals" | "profile"; no: string; ad: string; icon: string }[] = [
- { id: "today", no: "01", ad: "Bugün", icon: "•" },
-{ id: "train", no: "02", ad: "Antrenman & GPS", icon: "•" },
-{ id: "meals", no: "03", ad: "Beslenme", icon: "•" },
-{ id: "profile", no: "04", ad: "Profil & Hedef", icon: "•" },
-];
-
-export function ScoutApp() {
-  const currentUser = useAuth((s: any) => s.currentUser);
-  const [section, setSection] = useState<Section>("today");
+export function Shell() {
+  const [activeTab, setActiveTab] = useState<Section>("today");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [coachOpen, setCoachOpen] = useState(false);
-
-  const handleCikis = async () => {
-    bulutuDurdur();
-    (useAuth as any).setState({ currentUser: null });
-    await supabase.auth.signOut();
-  };
-
-  if (!currentUser) {
-    return <AuthView />;
-  }
 
   return (
-    <div className="min-h-dvh bg-paper text-ink flex flex-col font-sans">
-      {/* Üst Bar */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-paper/90 px-5 py-3.5 backdrop-blur">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-pine flex items-center justify-center text-cream font-bold text-sm shadow-sm">
-            S
+    <div className="min-h-screen bg-paper text-ink flex flex-col font-sans selection:bg-pine selection:text-paper">
+      {/* ÜST BAR (Status Bar çakışmasını kesin engelleyen güvenli boşluk) */}
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur-md pt-10 sm:pt-4 px-5 pb-3 transition-colors">
+        <div className="mx-auto flex max-w-lg items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pine text-paper font-serif font-bold text-sm shadow-sm">
+              SF
+            </div>
+            <div>
+              <span className="font-serif text-lg font-bold tracking-tight text-ink block leading-none">
+                ScoutFit
+              </span>
+              <span className="text-[11px] text-muted block mt-0.5 leading-none">
+                Antrenman & Beslenme Günlüğü
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="font-display text-lg font-bold text-pine block leading-tight">
-              ScoutFit
-            </span>
-            <span className="text-[10px] text-muted">Kişisel Antrenman Defteri</span>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setSettingsOpen(true)}
-            className="flex items-center gap-1 rounded-xl border border-line bg-cream/50 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-cream transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface text-muted hover:text-ink hover:border-muted/40 transition-colors"
+            aria-label="Ayarlar"
           >
-            <span>⚙️</span>
-            <span>Ayarlar</span>
+            <Settings className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* Ana İçerik */}
-      <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-10">
-        <div className="mx-auto w-full max-w-2xl">
-          <Icerik section={section} git={setSection} />
-        </div>
+      {/* ANA İÇERİK (Alt çubuğun içeriği örtmemesi için alt padding) */}
+      <main className="flex-1 px-4 pt-4 pb-28 mx-auto w-full max-w-lg">
+        {activeTab === "today" && <TodayView git={setActiveTab} />}
+        {activeTab === "train" && <TrainView />}
+        {activeTab === "meals" && <MealsView git={setActiveTab} />}
+        {activeTab === "profile" && <ProfilView git={setActiveTab} />}
+        {activeTab === "coach" && <CoachView />}
+        {activeTab === "goal" && <GoalView />}
       </main>
 
-     {/* Yüzen AI Koç Butonu (Floating Action Button) */}
-        <div className="fixed bottom-16 right-4 z-40 sm:bottom-20 sm:right-8">
-          <button
-            type="button"
-            onClick={() => setCoachOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-pine px-3.5 py-2.5 text-cream shadow-xl hover:opacity-95 transition-all active:scale-95 border border-white/10 backdrop-blur-sm"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-            </span>
-            <span className="text-[11px] font-bold tracking-wider font-mono uppercase text-emerald-300">
-              AI KOÇ
-            </span>
-          </button>
-        </div>
-
-      {/* AI Koç Modalı (Tam Ekran Kart) */}
-      {coachOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6 backdrop-blur-sm animate-fade-in">
-          <div className="relative flex h-full max-h-[640px] w-full max-w-2xl flex-col rounded-3xl border border-line bg-paper shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between border-b border-line px-5 py-3.5 bg-cream/30">
-              <div className="flex items-center gap-2">
-                <span className="text-xl"></span>
-                <div>
-                  <h3 className="font-display text-base font-bold text-ink leading-tight">
-                    Scout AI Koç
-                  </h3>
-                  <span className="text-[10px] text-muted">Performans Asistanı</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCoachOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-cream text-sm text-muted hover:text-ink"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <CoachView />
-            </div>
-          </div>
-        </div>
+      {/* KOÇ BUTONU (Yüzen Eylem Butonu) */}
+      {activeTab !== "coach" && (
+        <button
+          type="button"
+          onClick={() => setActiveTab("coach")}
+          className="fixed right-5 bottom-24 z-40 flex items-center gap-2 rounded-full bg-pine px-4 py-2.5 text-[13px] font-medium text-paper shadow-lg hover:opacity-95 active:scale-95 transition-all"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Koç</span>
+        </button>
       )}
 
-      {/* Modern 4'lü Alt Navigasyon Barı (Mobil Uyumlu) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-line bg-paper/95 backdrop-blur px-3 py-2">
+      {/* ALT GEZİNME ÇUBUĞU */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-paper/95 backdrop-blur-md pb-6 pt-2 px-3">
         <div className="mx-auto flex max-w-lg items-center justify-around">
-          {NAV.map((item) => {
-            const aktif = section === item.id || (item.id === "profile" && section === "goal");
+          {[
+            { id: "today", label: "Bugün", Icon: CalendarDays },
+            { id: "train", label: "Antrenman", Icon: Dumbbell },
+            { id: "meals", label: "Beslenme", Icon: UtensilsCrossed },
+            { id: "profile", label: "Profil", Icon: User },
+          ].map(({ id, label, Icon }) => {
+            const isActive = activeTab === id;
             return (
               <button
-                key={item.id}
+                key={id}
                 type="button"
-                onClick={() => setSection(item.id)}
-                className={`relative flex flex-col items-center justify-center px-3 py-1 transition-all ${
-                  aktif ? "text-pine font-bold" : "text-muted hover:text-ink"
+                onClick={() => setActiveTab(id as Section)}
+                className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-1 transition-colors ${
+                  isActive ? "text-pine font-medium" : "text-muted hover:text-ink"
                 }`}
               >
-                <span className={`text-xl transition-transform ${aktif ? "scale-110" : "scale-100 opacity-70"}`}>
-                  {item.icon}
-                </span>
-                <span className="mt-0.5 text-[10px] tracking-tight">{item.ad}</span>
-                {aktif && (
-                  <span className="absolute -bottom-1 h-1 w-1 rounded-full bg-pine" />
-                )}
+                <Icon className={`w-5 h-5 ${isActive ? "stroke-[2.2]" : "stroke-[1.6]"}`} />
+                <span className="text-[11px] leading-none">{label}</span>
               </button>
             );
           })}
         </div>
       </nav>
 
-      <SettingsModal
-        acik={settingsOpen}
-        kapat={() => setSettingsOpen(false)}
-      />
+      {/* AYARLAR PENCERESİ */}
+      <SettingsModal acik={settingsOpen} kapat={() => setSettingsOpen(false)} />
     </div>
   );
 }
 
-function Icerik({ section, git }: { section: Section; git: (s: Section) => void }) {
-  if (section === "today") return <TodayView git={git} />;
-  if (section === "goal") return <GoalView />;
-  if (section === "train") return <TrainView />;
-  if (section === "meals") return <MealsView git={git} />;
-  if (section === "profile") {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-end">
-          <button
-            type="button"
-            onClick={() => git("goal")}
-            className="flex items-center gap-1.5 rounded-xl border border-line bg-cream/40 px-3 py-1.5 text-xs font-semibold text-pine hover:bg-cream"
-          >
-            <span>🎯</span>
-            <span>Hedef & Kilo Projeksiyonu</span>
-          </button>
-        </div>
-        <ProfilView git={git} />
-      </div>
-    );
-  }
-  return <TodayView git={git} />;
-}
+// Router'daki ScoutApp import uyumluluğu için alias
+export { Shell as ScoutApp };

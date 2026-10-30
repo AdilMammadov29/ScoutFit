@@ -1,15 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { ScoutApp } from '../components/shell'
-import { AuthGate } from '../components/authgate'
+import { createFileRoute } from '@tanstack/react-router';
+import { Shell } from '../components/shell';
 
 export const Route = createFileRoute('/')({
   component: ProtectedRoute,
-})
+});
 
 function ProtectedRoute() {
-  return (
-    <AuthGate>
-      <ScoutApp />
-    </AuthGate>
-  )
+  return <Shell />;
 }

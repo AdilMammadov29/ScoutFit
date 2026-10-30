@@ -9,6 +9,13 @@ export interface GunlukAktivite {
   uykuSaat?: number | null;
 }
 
+export interface AktifAntrenman {
+  aktif: boolean;
+  baslangicZamani: number;
+  baslangicAdim: number;
+  bolge: string;
+}
+
 export interface ActivityState {
   bugunAdim: number;
   hedefAdim: number;
@@ -17,6 +24,7 @@ export interface ActivityState {
   bugunUykuSaat: number | null;
   favoriKaplar: number[];
   haftalikGecmis: GunlukAktivite[];
+  aktifAntrenman: AktifAntrenman | null;
 
   suEkle: (ml: number) => void;
   suSifirla: () => void;
@@ -24,6 +32,9 @@ export interface ActivityState {
   favoriKapSil: (ml: number) => void;
   adimGuncelle: (adim: number) => void;
   uykuGuncelle: (saat: number) => void;
+  antrenmanBaslat: (bolge: string) => void;
+  antrenmanBitir: () => { sureDk: number; adim: number; mesafeKm: number; bolge: string } | null;
+  antrenmanIptal: () => void;
   istatistikleriGetir: () => {
     gunlukAdim: number;
     gunlukKm: string;
@@ -60,6 +71,7 @@ export const useActivity = create<ActivityState>((set, get) => {
   const baslangicAdim = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunAdim ?? 0) : 0;
   const baslangicUyku = yuklenen?.sonTarih === bugunStr ? (yuklenen.bugunUykuSaat ?? null) : null;
   const favoriler = yuklenen?.favoriKaplar ?? [250, 330, 500, 750];
+  const baslangicAntrenman = yuklenen?.aktifAntrenman ?? null;
 
   const kaydetLocal = (yeni: Partial<ActivityState>) => {
     const s = get();
@@ -72,6 +84,7 @@ export const useActivity = create<ActivityState>((set, get) => {
         bugunUykuSaat: yeni.bugunUykuSaat !== undefined ? yeni.bugunUykuSaat : s.bugunUykuSaat,
         favoriKaplar: yeni.favoriKaplar ?? s.favoriKaplar,
         haftalikGecmis: s.haftalikGecmis,
+        aktifAntrenman: yeni.aktifAntrenman !== undefined ? yeni.aktifAntrenman : s.aktifAntrenman,
       })
     );
   };
@@ -84,6 +97,7 @@ export const useActivity = create<ActivityState>((set, get) => {
     bugunUykuSaat: baslangicUyku,
     favoriKaplar: favoriler,
     haftalikGecmis: yuklenen?.haftalikGecmis ?? [],
+    aktifAntrenman: baslangicAntrenman,
 
     suEkle: (ml: number) => {
       const oncekiSu = get().bugunSuMl;
@@ -93,7 +107,6 @@ export const useActivity = create<ActivityState>((set, get) => {
       set({ bugunSuMl: yeniSu });
       kaydetLocal({ bugunSuMl: yeniSu });
 
-      // Hedefe ilk kez ulaşıldığında bildirim düşer
       if (yeniSu >= hedef && oncekiSu < hedef) {
         useNotifications.getState().bildirimEkle(
           "Su Hedefi Tamamlandı",
@@ -128,7 +141,6 @@ export const useActivity = create<ActivityState>((set, get) => {
       set({ bugunAdim: adim });
       kaydetLocal({ bugunAdim: adim });
 
-      // Adım hedefine ilk kez ulaşıldığında bildirim düşer
       if (adim >= hedef && oncekiAdim < hedef) {
         useNotifications.getState().bildirimEkle(
           "Adım Hedefi Tamamlandı",
@@ -141,6 +153,47 @@ export const useActivity = create<ActivityState>((set, get) => {
     uykuGuncelle: (saat: number) => {
       set({ bugunUykuSaat: saat });
       kaydetLocal({ bugunUykuSaat: saat });
+    },
+
+    antrenmanBaslat: (bolge: string) => {
+      const baslangicAdim = get().bugunAdim;
+      const yeniAntrenman: AktifAntrenman = {
+        aktif: true,
+        baslangicZamani: Date.now(),
+        baslangicAdim,
+        bolge,
+      };
+      set({ aktifAntrenman: yeniAntrenman });
+      kaydetLocal({ aktifAntrenman: yeniAntrenman });
+    },
+
+    antrenmanBitir: () => {
+      const { aktifAntrenman, bugunAdim } = get();
+      if (!aktifAntrenman || !aktifAntrenman.aktif) return null;
+
+      const suAn = Date.now();
+      const sureMs = Math.max(0, suAn - aktifAntrenman.baslangicZamani);
+      const sureDk = Math.max(1, Math.round(sureMs / 60000));
+
+      let netAdim = bugunAdim - aktifAntrenman.baslangicAdim;
+      if (netAdim < 0) netAdim = bugunAdim; // Gece yarısı gün devri veya sıfırlanma toleransı
+
+      const mesafeKm = Number(((netAdim * 0.75) / 1000).toFixed(2));
+      const sonuc = {
+        sureDk,
+        adim: netAdim,
+        mesafeKm,
+        bolge: aktifAntrenman.bolge,
+      };
+
+      set({ aktifAntrenman: null });
+      kaydetLocal({ aktifAntrenman: null });
+      return sonuc;
+    },
+
+    antrenmanIptal: () => {
+      set({ aktifAntrenman: null });
+      kaydetLocal({ aktifAntrenman: null });
     },
 
     istatistikleriGetir: () => {
@@ -167,10 +220,8 @@ export const useActivity = create<ActivityState>((set, get) => {
   };
 });
 
-// Cihaz adım sensörünü dinler ve bugunAdim değerini günceller
+// Cihaz adım sensörünü dinler ve doğrudan bugunAdim'e yansıtır
 adimTakibiniBaslat((gelenAdim: number) => {
   const store = useActivity.getState();
-  if (gelenAdim > store.bugunAdim) {
-    store.adimGuncelle(gelenAdim);
-  }
+  store.adimGuncelle(gelenAdim);
 });
