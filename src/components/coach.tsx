@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { kocSor } from "../lib/coach";
 import { profildenHesap } from "../lib/engine";
 import { useFit } from "../lib/store";
 import { useActivity } from "../lib/activityStore";
@@ -34,9 +33,8 @@ export function CoachView() {
   const h = profil ? profildenHesap(profil) : null;
 
   const { bugunSuMl, hedefSuMl, bugunAdim, istatistikleriGetir } = useActivity();
-  const { kayitlar, seri, kacamakNedeni, kacamakNotu } = useDiet();
+  const { kayitlar, seri, kacamakNedeni } = useDiet();
 
-  // Store sohbetini UI formatına çevir; boşsa karşılama göster
   const karsilama: Mesaj = {
     id: "ilk-karsilama",
     gonderen: "koc",
@@ -126,7 +124,6 @@ export function CoachView() {
       zaman: simdikiZaman,
     };
 
-    // İlk statik karşılama mesajını hariç tutarak geçmişi hazırla
     const apiGecmis = mesajlar
       .filter((m) => m.id !== "ilk-karsilama")
       .slice(-6)
@@ -160,25 +157,49 @@ export function CoachView() {
       .filter(Boolean)
       .join(" | ");
 
+    const sistemPrompt = `Sen ScoutFit uygulamasının uzman, profesyonel ve motive edici fitness/beslenme koçusun.
+Kullanıcının antrenmanlarını, kalori hedeflerini ve sağlık disiplinini takip ediyorsun.
+Cevapların net, doğrudan, bilimsel temelli, uygulanabilir ve samimi olsun. Asla gereksiz edebiyat yapma, net tavsiye ver.
+
+Kullanıcı Durumu ve Verileri:
+${baglam}`;
+
     try {
-      const res = await kocSor({
-        data: {
-          soru: s,
-          baglam,
-          gecmis: apiGecmis,
+      // Doğrudan oluşturduğumuz güvenli Vercel sunucusuz proxy adresine POST atıyoruz
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: sistemPrompt },
+            ...apiGecmis,
+            { role: "user", content: s },
+          ],
+          temperature: 0.7,
+        }),
       });
 
-      if (res.ok && res.metin) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Sunucu hatası: ${response.status}`);
+      }
+
+      const resData = await response.json();
+      const cevapMetni = resData.choices?.[0]?.message?.content || "";
+
+      if (cevapMetni.trim()) {
         const koctanGelen: Mesaj = {
           id: (Date.now() + 1).toString(),
           gonderen: "koc",
-          metin: res.metin,
+          metin: cevapMetni.trim(),
           zaman: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
-        ekleMesaj({ id: koctanGelen.id, rol: "koc", metin: res.metin });
+        ekleMesaj({ id: koctanGelen.id, rol: "koc", metin: cevapMetni.trim() });
       } else {
-        setHata(res.hata || "Koç şu an yanıt veremiyor.");
+        setHata("Koçtan boş yanıt geldi.");
       }
     } catch (err: any) {
       setHata("Bağlantı hatası: " + (err?.message || "Sunucuya ulaşılamadı."));
@@ -203,12 +224,12 @@ export function CoachView() {
   const sadeceKarsilamaVar = mesajlar.length === 1 && mesajlar[0].id === "ilk-karsilama";
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-140px)] max-w-3xl flex-col space-y-4 font-sans">
+    <div className="mx-auto flex h-[calc(100vh-140px)] max-w-3xl flex-col space-y-4 font-sans text-neutral-900 dark:text-neutral-100">
       {/* Üst Başlık */}
-      <div className="flex items-center justify-between border-b border-line pb-3">
+      <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
         <div>
-          <h1 className="font-serif text-xl font-bold text-ink">Koç</h1>
-          <p className="text-[13px] text-muted">
+          <h1 className="font-serif text-xl font-bold text-neutral-900 dark:text-neutral-50">Koç</h1>
+          <p className="text-[13px] text-neutral-500 dark:text-neutral-400">
             Haftalık antrenman, su ve beslenme verilerin bağlama eklendi.
           </p>
         </div>
@@ -223,31 +244,29 @@ export function CoachView() {
               m.gonderen === "kullanici" ? "items-end" : "items-start"
             }`}
           >
-            <div className="mb-1 flex items-center gap-1.5 px-1 text-[12px] text-muted">
+            <div className="mb-1 flex items-center gap-1.5 px-1 text-[12px] text-neutral-400 dark:text-neutral-500">
               <span>{m.gonderen === "kullanici" ? "Sen" : "Koç"}</span>
               <span>·</span>
               <span>{m.zaman}</span>
             </div>
 
             {m.gonderen === "kullanici" ? (
-              // Kullanıcı Mesajı: Pine Dolgulu Balon
-              <div className="relative max-w-[85%] rounded-xl bg-pine px-4 py-3 text-[15px] leading-relaxed text-paper shadow-sm whitespace-pre-line">
+              <div className="relative max-w-[85%] rounded-2xl bg-emerald-700 dark:bg-emerald-600 px-4 py-3 text-[15px] leading-relaxed text-white shadow-sm whitespace-pre-line">
                 {m.metin}
               </div>
             ) : (
-              // Koç Mesajı: Balonsuz, Düz ve Ferah Editoryal Akış
-              <div className="group relative max-w-[92%] py-1 text-[15px] leading-relaxed text-ink whitespace-pre-line">
-                <p className="text-ink">{m.metin}</p>
+              <div className="group relative max-w-[92%] py-1 text-[15px] leading-relaxed text-neutral-900 dark:text-neutral-100 whitespace-pre-line">
+                <p>{m.metin}</p>
                 <div className="mt-1 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => kopyala(m.id, m.metin)}
-                    className="inline-flex items-center gap-1 text-[12px] text-muted opacity-60 hover:opacity-100 hover:text-ink transition-opacity duration-150"
+                    className="inline-flex items-center gap-1 text-[12px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
                   >
                     {kopyalananId === m.id ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-pine" />
-                        <span className="text-pine">Kopyalandı</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-emerald-600 dark:text-emerald-400">Kopyalandı</span>
                       </>
                     ) : (
                       <>
@@ -262,13 +281,12 @@ export function CoachView() {
           </div>
         ))}
 
-        {/* Yükleniyor Göstergesi: Sessiz 3 Nokta */}
         {yukleniyor && (
-          <div className="flex items-center gap-1.5 py-2 px-1 text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-muted/60 animate-pulse [animation-delay:-0.3s]"></span>
-            <span className="h-1.5 w-1.5 rounded-full bg-muted/60 animate-pulse [animation-delay:-0.15s]"></span>
-            <span className="h-1.5 w-1.5 rounded-full bg-muted/60 animate-pulse"></span>
-            <span className="ml-2 text-[13px] text-muted">Koç düşünüyor...</span>
+          <div className="flex items-center gap-1.5 py-2 px-1 text-neutral-400 dark:text-neutral-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse [animation-delay:-0.3s]"></span>
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse [animation-delay:-0.15s]"></span>
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
+            <span className="ml-2 text-[13px]">Koç düşünüyor...</span>
           </div>
         )}
 
@@ -277,16 +295,16 @@ export function CoachView() {
 
       {/* Hata Bildirimi */}
       {hata && (
-        <div className="flex items-center gap-2 rounded-xl border border-clay/30 bg-clay/5 p-3 text-[13px] text-clay">
+        <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-[13px] text-rose-600 dark:text-rose-400">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span className="leading-snug">{hata}</span>
         </div>
       )}
 
-      {/* Hızlı Sorular: Boşken Dikey Liste, Konuşma Başlayınca Yatay Şerit */}
+      {/* Hızlı Sorular */}
       {sadeceKarsilamaVar ? (
         <div className="space-y-2 py-1">
-          <span className="text-[12px] font-medium text-muted block mb-1">
+          <span className="text-[12px] font-medium text-neutral-500 dark:text-neutral-400 block mb-1">
             Önerilen Sorular:
           </span>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -296,7 +314,7 @@ export function CoachView() {
                 type="button"
                 onClick={() => soruyuGonder(item)}
                 disabled={yukleniyor}
-                className="flex min-h-[44px] items-center rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left text-[13px] text-ink hover:border-muted/40 transition-colors duration-150 disabled:opacity-50"
+                className="flex min-h-[44px] items-center rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3.5 py-2.5 text-left text-[13px] text-neutral-800 dark:text-neutral-200 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors disabled:opacity-50"
               >
                 {item}
               </button>
@@ -311,7 +329,7 @@ export function CoachView() {
               type="button"
               onClick={() => soruyuGonder(item)}
               disabled={yukleniyor}
-              className="whitespace-nowrap rounded-xl border border-line bg-surface px-3 py-1.5 text-[13px] text-muted hover:border-muted/40 hover:text-ink transition-colors duration-150 active:scale-95 disabled:opacity-50"
+              className="whitespace-nowrap rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3 py-1.5 text-[13px] text-neutral-600 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors active:scale-95 disabled:opacity-50"
             >
               {item}
             </button>
@@ -319,16 +337,16 @@ export function CoachView() {
         </div>
       )}
 
-      {/* Giriş Alanı: Tek Parça, Sol Mic, Orta Textarea, Sağ ArrowUp */}
-      <div className="relative flex items-center gap-2 rounded-xl border border-line bg-surface p-2 focus-within:border-muted/60 transition-colors duration-150">
+      {/* Giriş Alanı */}
+      <div className="relative flex items-center gap-2 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-2 shadow-sm focus-within:border-emerald-500 transition-colors">
         <button
           type="button"
           onClick={sesleDinle}
           aria-label={dinleniyor ? "Dinleniyor" : "Sesle sor"}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors duration-150 ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
             dinleniyor
-              ? "bg-clay/10 text-clay"
-              : "text-muted hover:text-ink hover:bg-paper"
+              ? "bg-rose-500/10 text-rose-500"
+              : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800"
           }`}
         >
           <Mic className={`w-5 h-5 ${dinleniyor ? "animate-pulse" : ""}`} />
@@ -340,7 +358,7 @@ export function CoachView() {
           onChange={(e) => setSoru(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={dinleniyor ? "Dinleniyor..." : "Bir şey sor..."}
-          className="flex-1 resize-none bg-transparent py-2 px-1 text-[15px] leading-normal text-ink outline-none placeholder:text-muted/60 max-h-32"
+          className="flex-1 resize-none bg-transparent py-2 px-1 text-[15px] leading-normal text-neutral-900 dark:text-neutral-100 outline-none placeholder:text-neutral-400 max-h-32"
         />
 
         <button
@@ -348,7 +366,7 @@ export function CoachView() {
           onClick={() => soruyuGonder(soru)}
           disabled={yukleniyor || !soru.trim()}
           aria-label="Gönder"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pine text-paper transition-opacity duration-150 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 dark:bg-emerald-600 text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-30"
         >
           <ArrowUp className="w-5 h-5" />
         </button>
