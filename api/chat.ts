@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
   const barcode = url.searchParams.get('barcode');
   const search = url.searchParams.get('search');
 
-  // Barkod sorgusu
+  // Barkod Servisi
   if (barcode) {
     try {
       const offRes = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
@@ -34,7 +34,7 @@ export default async function handler(req: Request) {
     }
   }
 
-  // Besin Arama (CORS engelleme)
+  // Besin Arama
   if (search) {
     try {
       const offRes = await fetch(
@@ -84,7 +84,7 @@ export default async function handler(req: Request) {
       body: JSON.stringify({
         model: body.model || 'llama-3.3-70b-versatile',
         messages: body.messages,
-        temperature: body.temperature ?? 0.4,
+        temperature: body.temperature ?? 0.5,
         max_tokens: body.max_tokens ?? 1024,
       }),
     });

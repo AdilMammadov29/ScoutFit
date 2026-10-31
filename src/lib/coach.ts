@@ -1,62 +1,44 @@
-import { sendAIChatRequest, AI_CONFIG, ChatMessage } from "@/services/ai/client";
-
-export function yerelKoc(soru: string, kalori: number): string {
-  const q = soru.toLocaleLowerCase("tr-TR");
-  if (["naber", "merhaba", "selam", "hey", "nasılsın", "iyi günler"].some((k) => q.includes(k))) {
-    return `Merhaba! Günlük hedefin ${kalori} kcal. Antrenman, öğün ya da tempo — hangisini konuşalım?`;
-  }
-  return `${kalori} kcal hedefini bozmadan sorunu antrenman ya da öğün olarak netleştirirsen daha kısa cevap veririm. Neyi değiştirmek istiyorsun?`;
+export interface KocSorParams {
+  data: {
+    soru: string;
+    baglam?: string;
+    gecmis?: Array<{ role: "user" | "assistant"; content: string }>;
+  };
 }
 
-export interface ChatMesaji {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
+export async function kocSor({ data }: KocSorParams) {
+  const { soru, baglam = "", gecmis = [] } = data;
 
-export interface KocGirdi {
-  soru: string;
-  baglam?: string;
-  gecmis?: ChatMesaji[];
-}
+  const sistemPrompt = `Sen ScoutFit uygulamasının uzman, samimi ve motive edici fitness ve beslenme koçusun.
+Kullanıcının antrenman ve beslenme verilerini dikkate alarak net, doğrudan ve uygulanabilir tavsiyeler ver.
 
-export async function kocSor({ data }: { data: KocGirdi }): Promise<{ ok: boolean; metin?: string; hata?: string }> {
-  const soru = String(data?.soru ?? "").trim();
-  const baglam = String(data?.baglam ?? "").trim();
-
-  if (!soru) return { ok: false, hata: "Soru boş bırakılamaz." };
-
-  const sistemIcerik = `Sen ScoutFit uygulamasının kişisel antrenman ve beslenme koçusun.
-Kullanıcı durumu: ${baglam || "Belirtilmedi"}.
-
-Kurallar:
-- Samimi, kısa ve net Türkçe konuş.
-- Konuyu dağıtma, her zaman yardımcı ol.
-- Sadece antrenman, beslenme, motivasyon ve sağlık konularında cevap ver.
-- Kullanıcı "naber", "merhaba", "selam" gibi bir şey derse doğal ve samimi karşılık ver.
-- Gereksiz uzun konuşma yapma.`;
-
-  const messages: ChatMessage[] = [{ role: "system", content: sistemIcerik }];
-
-  if (Array.isArray(data?.gecmis)) {
-    for (const m of data.gecmis) {
-      if (m?.content?.trim()) {
-        messages.push({ role: m.role, content: m.content.trim() });
-      }
-    }
-  }
-
-  messages.push({ role: "user", content: soru });
+Kullanıcı Verileri ve Bağlamı:
+${baglam || "Bağlam bilgisi yok."}`;
 
   try {
-    const metin = await sendAIChatRequest(messages, {
-      model: AI_CONFIG.models.coach,
-      temperature: 0.5,
-      maxTokens: 600,
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: sistemPrompt },
+          ...gecmis,
+          { role: "user", content: soru },
+        ],
+        temperature: 0.5,
+      }),
     });
 
-    if (metin) return { ok: true, metin };
-    return { ok: false, hata: "Koç yanıt üretemedi." };
+    if (!res.ok) {
+      const errText = await res.text();
+      return { ok: false, hata: `Sunucu hatası (${res.status}): ${errText}` };
+    }
+
+    const json = await res.json();
+    const metin = json.choices?.[0]?.message?.content?.trim();
+    return { ok: true, metin };
   } catch (err: any) {
-    return { ok: false, hata: err?.message || "Bağlantı hatası oluştu." };
+    return { ok: false, hata: "Bağlantı hatası: " + err.message };
   }
 }
