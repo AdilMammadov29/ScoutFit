@@ -17,7 +17,7 @@ export default async function handler(req: Request) {
   const barcode = url.searchParams.get('barcode');
   const search = url.searchParams.get('search');
 
-  // iPhone ve Web için Barkod Arama Desteği
+  // Barkod sorgusu
   if (barcode) {
     try {
       const offRes = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
@@ -34,7 +34,7 @@ export default async function handler(req: Request) {
     }
   }
 
-  // Besin Arama (CORS Hatasını Engeller)
+  // Besin Arama (CORS engelleme)
   if (search) {
     try {
       const offRes = await fetch(
@@ -81,7 +81,12 @@ export default async function handler(req: Request) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: body.model || 'llama-3.3-70b-versatile',
+        messages: body.messages,
+        temperature: body.temperature ?? 0.4,
+        max_tokens: body.max_tokens ?? 1024,
+      }),
     });
 
     const data = await groqResponse.text();
