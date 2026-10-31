@@ -22,10 +22,7 @@ export async function sendAIChatRequest(
   messages: ChatMessage[] | any[],
   options?: SendAIChatOptions | string
 ): Promise<string> {
-  // Canlıda /api/chat yoluna gider
-  const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
-  const baseUrl = isLocal ? "" : window.location.origin;
-  const targetUrl = `${baseUrl}/api/chat`;
+  const targetUrl = "/api/chat";
 
   let selectedModel = AI_CONFIG.models.coach;
   let temperature = 0.7;
@@ -60,7 +57,7 @@ export async function sendAIChatRequest(
       const json = JSON.parse(errorBody);
       parsedMessage = json.error?.message || json.error || errorBody;
     } catch {
-      // ham metin kalır
+      // ham mesaj
     }
     throw new Error(`AI Hatası (${response.status}): ${parsedMessage}`);
   }

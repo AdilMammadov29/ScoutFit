@@ -13,6 +13,48 @@ export default async function handler(req: Request) {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const url = new URL(req.url);
+  const barcode = url.searchParams.get('barcode');
+  const search = url.searchParams.get('search');
+
+  // iPhone ve Web için Barkod Arama Desteği
+  if (barcode) {
+    try {
+      const offRes = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
+      const offData = await offRes.text();
+      return new Response(offData, {
+        status: offRes.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: 'Barkod servisi hatası' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  // Besin Arama (CORS Hatasını Engeller)
+  if (search) {
+    try {
+      const offRes = await fetch(
+        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
+          search
+        )}&search_simple=1&action=process&json=1&page_size=3`
+      );
+      const offData = await offRes.text();
+      return new Response(offData, {
+        status: offRes.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: 'Arama servisi hatası' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405,
