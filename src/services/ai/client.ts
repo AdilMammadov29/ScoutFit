@@ -57,7 +57,7 @@ export async function sendAIChatRequest(
       const json = JSON.parse(errorBody);
       parsedMessage = json.error?.message || json.error || errorBody;
     } catch {
-      // ham mesaj
+      // ham mesaj kalır
     }
     throw new Error(`AI Hatası (${response.status}): ${parsedMessage}`);
   }
