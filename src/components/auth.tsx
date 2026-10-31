@@ -94,19 +94,19 @@ export function AuthView() {
   };
 
   return (
-    <div className="min-h-screen bg-paper text-ink flex flex-col justify-between items-center px-6 py-12 select-none font-sans transition-colors duration-150">
+    <div className="min-h-screen bg-stone-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col justify-between items-center px-6 py-12 select-none font-sans transition-colors duration-200">
       <div className="w-full max-w-sm flex flex-col items-center pt-8">
         {/* Monogram Logo */}
-        <div className="w-14 h-14 rounded-2xl bg-pine text-paper flex items-center justify-center mb-8 shadow-sm">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-800 dark:bg-emerald-600 text-stone-50 flex items-center justify-center mb-8 shadow-sm">
           <span className="font-serif font-bold text-2xl tracking-tight">SF</span>
         </div>
 
         {/* Tipografi & Slogan */}
         <div className="text-center space-y-2">
-          <h1 className="font-serif text-3xl font-bold tracking-tight text-ink">
+          <h1 className="font-serif text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
             ScoutFit
           </h1>
-          <p className="text-[13px] text-muted leading-relaxed">
+          <p className="text-[13px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
             {isTr ? "Kişisel Antrenman ve Beslenme Günlüğü" : "Personal Training & Nutrition Journal"}
           </p>
         </div>
@@ -114,12 +114,12 @@ export function AuthView() {
 
       <div className="w-full max-w-sm space-y-4 pb-4">
         {errorMsg && (
-          <div className="p-3.5 rounded-xl border border-clay/30 bg-clay/5 text-clay text-[13px] leading-relaxed">
+          <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[13px] leading-relaxed">
             {errorMsg}
           </div>
         )}
         {infoMsg && (
-          <div className="p-3.5 rounded-xl border border-pine/30 bg-pine/5 text-pine text-[13px] leading-relaxed">
+          <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[13px] leading-relaxed">
             {infoMsg}
           </div>
         )}
@@ -129,7 +129,7 @@ export function AuthView() {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full min-h-[48px] rounded-xl border border-line bg-surface text-ink font-medium text-[14px] px-5 flex items-center justify-between shadow-sm active:scale-[0.99] transition-all hover:border-muted/40 disabled:opacity-50"
+          className="w-full min-h-[48px] rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 font-medium text-[14px] px-5 flex items-center justify-between shadow-sm active:scale-[0.99] transition-all hover:border-neutral-300 dark:hover:border-neutral-700 disabled:opacity-50"
         >
           <div className="flex items-center gap-3">
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -155,9 +155,9 @@ export function AuthView() {
             </span>
           </div>
           {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-muted" />
+            <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
           ) : (
-            <ArrowRight className="w-4 h-4 text-muted" />
+            <ArrowRight className="w-4 h-4 text-neutral-400" />
           )}
         </button>
 
@@ -166,29 +166,29 @@ export function AuthView() {
           <button
             type="button"
             onClick={() => setShowEmailAuth(!showEmailAuth)}
-            className="w-full min-h-[44px] rounded-xl bg-surface text-ink font-medium text-[13px] px-4 flex items-center justify-between border border-line hover:border-muted/40 transition-colors"
+            className="w-full min-h-[44px] rounded-xl bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 font-medium text-[13px] px-4 flex items-center justify-between border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
           >
             <div className="flex items-center gap-2.5">
-              <Mail className="w-4 h-4 text-muted" />
+              <Mail className="w-4 h-4 text-neutral-400" />
               <span>{isTr ? "E-posta ile Devam Et" : "Continue with Email"}</span>
             </div>
             {showEmailAuth ? (
-              <ChevronUp className="w-4 h-4 text-muted" />
+              <ChevronUp className="w-4 h-4 text-neutral-400" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-muted" />
+              <ChevronDown className="w-4 h-4 text-neutral-400" />
             )}
           </button>
 
           {showEmailAuth && (
-            <div className="mt-3 p-4 rounded-xl bg-surface border border-line space-y-4">
-              <div className="flex border-b border-line pb-2 text-[13px] font-medium">
+            <div className="mt-3 p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-sm">
+              <div className="flex border-b border-neutral-200 dark:border-neutral-800 pb-2 text-[13px] font-medium">
                 <button
                   type="button"
                   onClick={() => setMode("login")}
                   className={`flex-1 text-center py-1.5 rounded-lg transition-colors ${
                     mode === "login"
-                      ? "bg-paper text-ink font-semibold"
-                      : "text-muted hover:text-ink"
+                      ? "bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-semibold"
+                      : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                   }`}
                 >
                   {isTr ? "Giriş" : "Login"}
@@ -198,8 +198,8 @@ export function AuthView() {
                   onClick={() => setMode("register")}
                   className={`flex-1 text-center py-1.5 rounded-lg transition-colors ${
                     mode === "register"
-                      ? "bg-paper text-ink font-semibold"
-                      : "text-muted hover:text-ink"
+                      ? "bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-semibold"
+                      : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                   }`}
                 >
                   {isTr ? "Kayıt" : "Register"}
@@ -208,32 +208,32 @@ export function AuthView() {
 
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="email@example.com"
-                    className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl bg-paper border border-line text-[14px] text-ink placeholder:text-muted/60 outline-none focus:border-muted/60 transition-colors"
+                    className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl bg-stone-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-[14px] text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 outline-none focus:border-neutral-400 dark:focus:border-neutral-600 transition-colors"
                   />
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl bg-paper border border-line text-[14px] text-ink placeholder:text-muted/60 outline-none focus:border-muted/60 transition-colors"
+                    className="w-full min-h-[44px] pl-10 pr-3.5 rounded-xl bg-stone-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-[14px] text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 outline-none focus:border-neutral-400 dark:focus:border-neutral-600 transition-colors"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full min-h-[44px] rounded-xl bg-pine text-paper font-medium text-[13px] flex items-center justify-center gap-2 transition-opacity hover:opacity-95 active:scale-[0.99] disabled:opacity-50"
+                  className="w-full min-h-[44px] rounded-xl bg-emerald-800 dark:bg-emerald-600 text-stone-50 font-medium text-[13px] flex items-center justify-center gap-2 transition-opacity hover:opacity-95 active:scale-[0.99] disabled:opacity-50"
                 >
                   {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-paper" />
+                    <Loader2 className="w-4 h-4 animate-spin text-stone-50" />
                   ) : mode === "login" ? (
                     isTr ? "Giriş Yap" : "Sign In"
                   ) : (
@@ -245,7 +245,7 @@ export function AuthView() {
           )}
         </div>
 
-        <p className="text-[12px] text-center text-muted pt-2 leading-relaxed">
+        <p className="text-[12px] text-center text-neutral-400 dark:text-neutral-500 pt-2 leading-relaxed">
           {isTr
             ? "Devam ederek Kullanım Şartları ve Gizlilik Politikasını kabul etmiş olursunuz."
             : "By continuing, you agree to our Terms of Service and Privacy Policy."}
