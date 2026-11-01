@@ -158,11 +158,14 @@ export function CoachView() {
       .filter(Boolean)
       .join(" | ");
 
-    const sistemPrompt = `Sen ScoutFit uygulamasının uzman, profesyonel ve motive edici fitness/beslenme koçusun.
-Kullanıcının antrenmanlarını, kalori hedeflerini ve sağlık disiplinini takip ediyorsun.
-Cevapların net, doğrudan, bilimsel temelli, uygulanabilir ve samimi olsun. Asla gereksiz edebiyat yapma, net tavsiye ver.
+    const sistemPrompt = `Sen ScoutFit uygulamasının uzman, profesyonel, motive edici ve samimi fitness koçusun.
+Kullanıcının mevcut antrenman, kalori, su ve haftalık verilerini arka planda biliyorsun.
 
-Kullanıcı Durumu ve Verileri:
+DAVRANIŞ KURALLARI:
+1. Kısa Selamlaşma: Kullanıcı sadece "selam", "naber", "merhaba", "günaydın", "iyi akşamlar" gibi basit bir selam verdiyse KESİNLİKLE uzun uzun verileri dökme veya analiz yapma. En fazla 1-2 samimi cümleyle selamını al ve topu ona at (Örn: "Selam! Bomba gibiyiz. Bugün nasıl hissediyorsun, antrenman veya beslenmeyle ilgili bir plan yapalım mı?").
+2. Spesifik Sorular: Kullanıcı bir soru sorduğunda veya analiz istediğinde verileri kullan. Net, bilimsel temelli, doğrudan ve maddeler halinde uygulanabilir tavsiyeler ver. Asla gereksiz edebiyat yapma.
+
+Kullanıcı Durumu ve Verileri (Sadece soruyla doğrudan ilgiliyse değin):
 ${baglam}`;
 
     try {
@@ -174,7 +177,7 @@ ${baglam}`;
         ],
         {
           model: "llama-3.3-70b-versatile",
-          temperature: 0.7,
+          temperature: 0.6,
         }
       );
 
