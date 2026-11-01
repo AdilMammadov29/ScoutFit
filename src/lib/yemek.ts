@@ -10,7 +10,7 @@ export interface YemekAnalizSonuc {
 }
 
 /**
- * Girdiden gramaj bilgisini ayıklar (Örn: "75 gram probis" -> { gramaj: 75, aramaMetni: "probis" })
+ * Girdiden gramaj bilgisini ayıklar (Örn: "75 gram probis" -> { gramaj: 75, temizMetin: "probis" })
  */
 function gramajAyikla(girdi: string): { gramaj: number; aramaMetni: string } {
   let gramaj = 100; // Varsayılan 100g
@@ -34,11 +34,12 @@ function gramajAyikla(girdi: string): { gramaj: number; aramaMetni: string } {
 
 /**
  * Open Food Facts Türkiye & Global Veritabanında Ürün Arama
- * Tarayıcıdan doğrudan gitmek CORS hatası verdiği için kendi /api/chat proxy'miz üzerinden sorguluyoruz.
  */
 async function openFoodFactsAra(terim: string, gramaj: number): Promise<YemekAnalizSonuc | null> {
   try {
-    const url = `/api/chat?search=${encodeURIComponent(terim)}`;
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
+      terim
+    )}&search_simple=1&action=process&json=1&page_size=3`;
 
     const res = await fetch(url);
     if (!res.ok) return null;
@@ -52,7 +53,7 @@ async function openFoodFactsAra(terim: string, gramaj: number): Promise<YemekAna
           p.nutriments && (p.nutriments["energy-kcal_100g"] || p.nutriments["energy-kcal"])
       ) || data.products[0];
 
-    const n = product?.nutriments;
+    const n = product.nutriments;
     if (!n) return null;
 
     const katsayi = gramaj / 100;
@@ -80,7 +81,7 @@ async function openFoodFactsAra(terim: string, gramaj: number): Promise<YemekAna
       yag: Math.round(yag100 * katsayi),
     };
   } catch (err) {
-    console.warn("Ürün sorgu hatası, Groq AI devreye girecek:", err);
+    console.warn("OpenFoodFacts sorgu hatası, Groq AI devreye girecek:", err);
     return null;
   }
 }
@@ -88,7 +89,7 @@ async function openFoodFactsAra(terim: string, gramaj: number): Promise<YemekAna
 /**
  * Groq AI ile Serbest Yemek / Porsiyon Analizi
  */
-async function aiYemekAnalizEt(girdi: string): Promise<YemekAnalizSonuc> {
+export async function aiYemekAnalizEt(girdi: string): Promise<YemekAnalizSonuc> {
   const sistemPrompt = `Sen uzman bir beslenme uzmanısın. Kullanıcının yazdığı yiyeceğin (ev yemeği, restoran yemeği, Türk lezzetleri veya paketli ürün) kalori ve makrolarını hesapla.
 
 ÖNEMLİ PORSIYON KURALLARI:
@@ -131,13 +132,9 @@ async function aiYemekAnalizEt(girdi: string): Promise<YemekAnalizSonuc> {
     kalori: Math.round(Number(parsed.kalori) || 0),
     protein: Math.round(Number(parsed.protein) || 0),
     karbonhidrat: Math.round(karbDeger),
-    karb: Math.round(karb100VeKarb(karbDeger)),
+    karb: Math.round(karbDeger),
     yag: Math.round(Number(parsed.yag) || 0),
   };
-}
-
-function karb100VeKarb(deger: number): number {
-  return deger;
 }
 
 /**
@@ -146,15 +143,17 @@ function karb100VeKarb(deger: number): number {
 export async function yemekAnalizEt(girdi: string): Promise<YemekAnalizSonuc> {
   const { gramaj, aramaMetni } = gramajAyikla(girdi);
 
-  // 1. Aşama: Paketli ürün mü? Open Food Facts API'sinde ara (Proxy üzerinden)
+  // 1. Aşama: Paketli ürün mü? Open Food Facts API'sinde ara
   if (aramaMetni.length >= 2) {
     const apiSonuc = await openFoodFactsAra(aramaMetni, gramaj);
     if (apiSonuc) {
+      console.log("Veritabanından bulundu (OpenFoodFacts):", apiSonuc);
       return apiSonuc;
     }
   }
 
   // 2. Aşama: Veritabanında yoksa Groq AI'a sor
+  console.log("Veritabanında bulunamadı, Groq AI analiz ediyor...");
   return await aiYemekAnalizEt(girdi);
 }
 

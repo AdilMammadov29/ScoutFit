@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { yemekAnalizEt } from "@/lib/yemek";
+import { yemekAnalizEt, aiYemekAnalizEt } from "@/lib/yemek";
 import { useOgun } from "@/lib/ogun";
 import type { Section } from "./shell";
 import {
@@ -30,6 +30,7 @@ interface TarananUrunBilgi {
   prot100: number;
   carb100: number;
   fat100: number;
+  tahmini?: boolean; // Veritabanında besin değeri yoksa yapay zeka tahmini
 }
 
 export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
@@ -207,19 +208,57 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
 
     try {
       const res = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${barkod}.json`
+        `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barkod)}.json?fields=product_name,product_name_tr,brands,nutriments,product_quantity`,
+        { signal: AbortSignal.timeout(15000) }
       );
       const data = await res.json();
 
       if (data.status === 1 && data.product) {
         const prod = data.product;
         const n = prod.nutriments || {};
+        const say = (...anahtarlar: string[]) => {
+          for (const k of anahtarlar) {
+            const v = Number(n[k]);
+            if (Number.isFinite(v) && v > 0) return v;
+          }
+          return 0;
+        };
 
         const ad = prod.product_name_tr || prod.product_name || "Barkodlu Ürün";
-        const cal = Math.round(n["energy-kcal_100g"] || n["energy-kcal"] || 0);
-        const prot = Math.round(n.proteins_100g || n.proteins || 0);
-        const carb = Math.round(n.carbohydrates_100g || n.carbohydrates || 0);
-        const fat = Math.round(n.fat_100g || n.fat || 0);
+        let prot = say("proteins_100g", "proteins");
+        let carb = say("carbohydrates_100g", "carbohydrates");
+        let fat = say("fat_100g", "fat");
+
+        // Kalori: önce kcal alanları, yoksa kJ'den çevir, o da yoksa makrolardan hesapla
+        let cal = say("energy-kcal_100g", "energy-kcal", "energy-kcal_value");
+        if (!cal) {
+          const kj = say("energy-kj_100g", "energy_100g", "energy-kj");
+          if (kj) cal = kj / 4.184;
+        }
+        if (!cal && (prot || carb || fat)) cal = prot * 4 + carb * 4 + fat * 9;
+
+        let tahmini = false;
+        if (!cal && !prot && !carb && !fat) {
+          // Veritabanında hiç besin değeri yok: yapay zekadan 100 g için tahmin iste
+          try {
+            const marka = prod.brands ? `${String(prod.brands).split(",")[0]} ` : "";
+            const t = await aiYemekAnalizEt(`100 gram ${marka}${ad}`);
+            cal = t.kalori;
+            prot = t.protein;
+            carb = t.karbonhidrat ?? t.karb ?? 0;
+            fat = t.yag;
+            tahmini = cal > 0;
+          } catch {
+            /* tahmin alınamazsa aşağıdaki uyarı gösterilir */
+          }
+        }
+
+        if (!cal) {
+          setKameraHata(
+            `"${ad}" bulundu ama besin değeri yok. Elle ekleyebilirsin.`
+          );
+          return;
+        }
 
         let varsayilanGram = 100;
         if (prod.product_quantity && !isNaN(Number(prod.product_quantity))) {
@@ -228,10 +267,11 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
 
         setTarananUrun({
           ad,
-          cal100: cal,
-          prot100: prot,
-          carb100: carb,
-          fat100: fat,
+          cal100: Math.round(cal),
+          prot100: Math.round(prot),
+          carb100: Math.round(carb),
+          fat100: Math.round(fat),
+          tahmini,
         });
         setGirilenGram(varsayilanGram);
       } else {
@@ -542,6 +582,11 @@ export function MealsView({ git: _git }: { git?: (s: Section) => void }) {
               <div>
                 <span className="text-[12px] text-muted block">Barkod Bulundu</span>
                 <h3 className="font-serif text-base font-bold text-ink mt-0.5">{tarananUrun.ad}</h3>
+                {tarananUrun.tahmini && (
+                  <span className="text-[11px] text-muted block mt-0.5">
+                    Besin değeri veritabanında yok, yapay zeka tahmini (100 g)
+                  </span>
+                )}
               </div>
               <button
                 type="button"
