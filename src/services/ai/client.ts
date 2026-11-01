@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -22,7 +24,13 @@ export async function sendAIChatRequest(
   messages: ChatMessage[] | any[],
   options?: SendAIChatOptions | string
 ): Promise<string> {
-  const targetUrl = "/api/chat";
+  // Web'de aynı origin'deki /api/chat kullanılır (dev'de Vite proxy, canlıda Vercel).
+  // APK'da göreli yol çalışmaz: VITE_API_BASE_URL (ör. https://scoutfit.vercel.app) zorunlu.
+  const base = String(import.meta.env.VITE_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  if (Capacitor.isNativePlatform() && !base) {
+    throw new Error("AI adresi tanımlı değil: .env içine VITE_API_BASE_URL ekleyip yeniden build al.");
+  }
+  const targetUrl = `${base}/api/chat`;
 
   let selectedModel = AI_CONFIG.models.coach;
   let temperature = 0.7;
@@ -37,7 +45,9 @@ export async function sendAIChatRequest(
     if (typeof options.max_tokens === "number") maxTokens = options.max_tokens;
   }
 
-  const response = await fetch(targetUrl, {
+  let response: Response;
+  try {
+    response = await fetch(targetUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -48,7 +58,10 @@ export async function sendAIChatRequest(
       temperature: temperature,
       max_tokens: maxTokens,
     }),
-  });
+    });
+  } catch {
+    throw new Error("AI sunucusuna ulaşılamadı. Bağlantını ve sunucunun çalıştığını kontrol et.");
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -57,7 +70,7 @@ export async function sendAIChatRequest(
       const json = JSON.parse(errorBody);
       parsedMessage = json.error?.message || json.error || errorBody;
     } catch {
-      // ham mesaj kalır
+      // ham metin kalır
     }
     throw new Error(`AI Hatası (${response.status}): ${parsedMessage}`);
   }

@@ -13,6 +13,8 @@ export default defineConfig({
     host: true, // veya '0.0.0.0'
     port: 5173,
     strictPort: true,
+    // AI istekleri: npm run dev:api ile açılan yerel proxy'ye gider
+    proxy: { '/api': 'http://localhost:3001' },
   },
   
 });

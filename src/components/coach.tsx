@@ -3,6 +3,7 @@ import { profildenHesap } from "../lib/engine";
 import { useFit } from "../lib/store";
 import { useActivity } from "../lib/activityStore";
 import { useDiet } from "../lib/nutritionStore";
+import { sendAIChatRequest } from "@/services/ai/client";
 import {
   Mic,
   ArrowUp,
@@ -165,30 +166,17 @@ Kullanıcı Durumu ve Verileri:
 ${baglam}`;
 
     try {
-      // Doğrudan oluşturduğumuz güvenli Vercel sunucusuz proxy adresine POST atıyoruz
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const cevapMetni = await sendAIChatRequest(
+        [
+          { role: "system", content: sistemPrompt },
+          ...apiGecmis,
+          { role: "user", content: s },
+        ],
+        {
           model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: sistemPrompt },
-            ...apiGecmis,
-            { role: "user", content: s },
-          ],
           temperature: 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `Sunucu hatası: ${response.status}`);
-      }
-
-      const resData = await response.json();
-      const cevapMetni = resData.choices?.[0]?.message?.content || "";
+        }
+      );
 
       if (cevapMetni.trim()) {
         const koctanGelen: Mesaj = {
@@ -202,7 +190,7 @@ ${baglam}`;
         setHata("Koçtan boş yanıt geldi.");
       }
     } catch (err: any) {
-      setHata("Bağlantı hatası: " + (err?.message || "Sunucuya ulaşılamadı."));
+      setHata("Bağlantı hatası: " + (err?.message || "Groq'a bağlanılamadı."));
     } finally {
       setYukleniyor(false);
     }

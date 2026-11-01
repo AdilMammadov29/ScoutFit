@@ -2,106 +2,64 @@ export const config = {
   runtime: 'edge',
 };
 
+const IZINLI_MODELLER = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*', // APK (https://localhost) ve web için gerekli
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function jsonYanit(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 export default async function handler(req: Request) {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
-
-  const url = new URL(req.url);
-  const barcode = url.searchParams.get('barcode');
-  const search = url.searchParams.get('search');
-
-  // Barkod Servisi
-  if (barcode) {
-    try {
-      const offRes = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
-      const offData = await offRes.text();
-      return new Response(offData, {
-        status: offRes.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    } catch {
-      return new Response(JSON.stringify({ error: 'Barkod servisi hatası' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-  }
-
-  // Besin Arama
-  if (search) {
-    try {
-      const offRes = await fetch(
-        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
-          search
-        )}&search_simple=1&action=process&json=1&page_size=3`
-      );
-      const offData = await offRes.text();
-      return new Response(offData, {
-        status: offRes.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    } catch {
-      return new Response(JSON.stringify({ error: 'Arama servisi hatası' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-  }
-
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonYanit(405, { error: { message: 'Method Not Allowed' } });
   }
 
   // @ts-ignore
   const apiKey = (process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '').trim();
-
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Sunucuda GROQ_API_KEY bulunamadı' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return jsonYanit(500, {
+      error: { message: 'Sunucuda GROQ_API_KEY tanımlı değil (Vercel > Settings > Environment Variables).' },
     });
   }
 
   try {
-    const body = await req.json();
+    const girdi = await req.json();
+    if (!Array.isArray(girdi?.messages) || girdi.messages.length === 0) {
+      return jsonYanit(400, { error: { message: 'messages gerekli' } });
+    }
 
+    // Anahtarı kötüye kullanıma karşı: sadece izinli model ve sınırlı parametreler iletilir
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(25000),
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: body.model || 'llama-3.3-70b-versatile',
-        messages: body.messages,
-        temperature: body.temperature ?? 0.5,
-        max_tokens: body.max_tokens ?? 1024,
+        model: IZINLI_MODELLER.includes(girdi.model) ? girdi.model : IZINLI_MODELLER[0],
+        messages: girdi.messages.slice(-30),
+        temperature: typeof girdi.temperature === 'number' ? girdi.temperature : 0.5,
+        max_tokens: Math.min(Number(girdi.max_tokens) || 1024, 1500),
       }),
     });
 
-    const data = await groqResponse.text();
-
-    return new Response(data, {
+    return new Response(await groqResponse.text(), {
       status: groqResponse.status,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message || 'AI Proxy Hatası' }), {
-      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  } catch (error: any) {
+    return jsonYanit(502, { error: { message: error?.message || 'AI proxy hatası' } });
   }
 }
