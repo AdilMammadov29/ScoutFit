@@ -15,8 +15,8 @@ export interface SendAIChatOptions {
 export const AI_CONFIG = {
   baseUrl: "/api/chat",
   models: {
-    coach: "llama-3.3-70b-versatile",
-    food: "llama-3.3-70b-versatile",
+    coach: "openai/gpt-oss-120b",
+    food: "openai/gpt-oss-120b",
   },
 };
 

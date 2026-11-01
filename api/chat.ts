@@ -2,7 +2,7 @@ export const config = {
   runtime: 'edge',
 };
 
-const IZINLI_MODELLER = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
+const IZINLI_MODELLER = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*', // APK (https://localhost) ve web için gerekli
@@ -51,7 +51,9 @@ export default async function handler(req: Request) {
         model: IZINLI_MODELLER.includes(girdi.model) ? girdi.model : IZINLI_MODELLER[0],
         messages: girdi.messages.slice(-30),
         temperature: typeof girdi.temperature === 'number' ? girdi.temperature : 0.5,
-        max_tokens: Math.min(Number(girdi.max_tokens) || 1024, 1500),
+        // gpt-oss düşünme token'ları da bu sınırdan harcar; çok düşük olursa boş cevap gelir
+        max_tokens: Math.min(Math.max(Number(girdi.max_tokens) || 1024, 800), 2000),
+        reasoning_effort: 'low',
       }),
     });
 

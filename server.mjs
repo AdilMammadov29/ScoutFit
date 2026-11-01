@@ -8,9 +8,9 @@ try {
   /* .env yoksa ortam değişkenlerine bakılır */
 }
 
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 const apiKey = (process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || "").trim();
-const IZINLI_MODELLER = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"];
+const IZINLI_MODELLER = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
 
 function json(res, status, body) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -57,7 +57,8 @@ createServer(async (req, res) => {
         model: IZINLI_MODELLER.includes(girdi.model) ? girdi.model : IZINLI_MODELLER[0],
         messages: girdi.messages.slice(-30),
         temperature: Number(girdi.temperature) || 0.5,
-        max_tokens: Math.min(Number(girdi.max_tokens) || 1024, 1500),
+        max_tokens: Math.min(Math.max(Number(girdi.max_tokens) || 1024, 800), 2000),
+        reasoning_effort: "low",
       }),
     });
     res.writeHead(r.status, { "Content-Type": "application/json" });
